@@ -173,25 +173,26 @@ gh --version
 - Workflow YAML syntax walkthrough
 - **Explain:** triggers (`push`, `pull_request`, `workflow_dispatch`), `on.paths` filtering
 
-### 2.2 Adding Secrets and Variables to GitHub
-- Add repository secrets:
-  - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (for Terraform — the infra repo uses static keys, not OIDC)
-  - `DEV_DB_PASSWORD`, `DEV_JWT_SECRET`
-- Add repository variables:
-  - `GH_ORG` (your GitHub username/org)
-  - `TF_STATE_BUCKET` (S3 bucket name)
-- **Explain:** secrets vs. variables, environment-scoped secrets
-
-> **Tag `infra` repo: `module-2.2-github-secrets`** (no code change — GitHub config only)
-
-### 2.3 Create Terraform GitHub Actions Workflow
+### 2.2 Create Terraform GitHub Actions Workflow
 - Add `.github/workflows/terraform.yml` with 3 jobs:
   - **Plan job:** `terraform fmt -check`, `init`, `validate`, `plan`, upload plan artifact
   - **Apply job:** downloads plan artifact, runs `terraform apply` (only on push to `main`)
   - **Destroy job:** manual trigger with confirmation gate (`workflow_dispatch`)
 - **Explain:** concurrency groups (prevent parallel state modifications), environment approval gates, artifact passing between jobs, S3 native locking (`use_lockfile = true`)
 
-> **Tag `infra` repo: `module-2.3-terraform-workflow`**
+> **Tag `infra` repo: `module-2.2-terraform-workflow`**
+
+### 2.3 Adding Secrets and Variables to GitHub
+- The workflow references `secrets.AWS_ACCESS_KEY_ID` and `vars.GH_ORG` — configure these before the workflow can run
+- Add repository secrets:
+  - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (for Terraform — the infra repo uses static keys, not OIDC)
+  - `DEV_DB_PASSWORD`, `DEV_JWT_SECRET`
+- Add repository variables:
+  - `GH_ORG` (your GitHub username/org)
+  - `TF_STATE_BUCKET` (S3 bucket name)
+- **Explain:** secrets vs. variables (secrets are encrypted and masked in logs, variables are plaintext), environment-scoped secrets
+
+> **Tag `infra` repo: `module-2.3-github-secrets`** (no code change — GitHub config only)
 
 ### 2.4 Enable Branch Protection and Approval Process
 - Protect `main` branch: require PR, require approvals, require status checks
@@ -211,8 +212,20 @@ gh --version
 > **Tag `infra` repo: `module-2.5-infra-via-ci`**
 
 ### 2.6 Destroy Infrastructure via GitHub Actions
-- Use `workflow_dispatch` with `action: destroy` and `confirm_destroy: "destroy"`
-- **Explain:** destroy safety gates, why we require confirmation
+- **Step 1 — Pre-destroy cleanup (run locally):** Delete ArgoCD apps, ingresses, and Helm charts before triggering destroy — ALBs created by the ALB Controller will block VPC deletion if left behind
+  ```bash
+  kubectl delete applications --all -n argocd
+  kubectl delete ingress --all -n dev
+  helm uninstall external-secrets -n external-secrets
+  helm uninstall argocd -n argocd
+  helm uninstall aws-load-balancer-controller -n kube-system
+  kubectl delete namespace argocd external-secrets dev qa prod --ignore-not-found
+  # Wait 2-3 minutes for ALBs to fully delete before proceeding
+  ```
+- **Step 2 — Trigger destroy:** Use `workflow_dispatch` with `action: destroy` and `confirm_destroy: "destroy"`
+- **Step 3 — Approve** in the `dev` environment gate
+- **Step 4 — Verify** all resources are cleaned up in AWS Console
+- **Explain:** destroy safety gates, why pre-cleanup is required (ALBs are not managed by Terraform), why we require confirmation
 
 > *End of Module 2 — Infrastructure is destroyed. Recreate it before Module 3.*
 
@@ -618,7 +631,8 @@ git push origin <tag-name>
 | 1.7 | `module-1.7-iam-module` | infra |
 | 1.8 | `module-1.8-all-modules` | infra |
 | 1.9 | `module-1.9-infra-verified` | infra |
-| 2.3 | `module-2.3-terraform-workflow` | infra |
+| 2.2 | `module-2.2-terraform-workflow` | infra |
+| 2.3 | `module-2.3-github-secrets` | infra |
 | 2.4 | `module-2.4-branch-protection` | infra |
 | 2.5 | `module-2.5-infra-via-ci` | infra |
 | 3.3 | `module-3.3-cluster-bootstrap` | infra |
