@@ -105,17 +105,17 @@ ls scripts/
 #           04_run_pipeline.py  05_deploy_services.py  06_verify_deployment.py
 
 cd ~/devops/zenpharma/infra
-git add envs/dev/main.tf
+git add scripts
 git commit -m "Adding bootstrap scripts"
 git push origin feat/bootstrap-scripts
 ```
 Raise a pull request to commit changes onto main. As we are doing changes outside of `envs/dev` and `modules/` it wont trigger a pipeline. 
 
-> **Tag `infra` repo: `module-3.3-bootstrap-scripts`**
+> **Tag `infra` repo: `module-3.2-bootstrap-scripts`**
 > ```bash
 > cd ~/devops/zenpharma/infra
-> git tag -a module-3.3-bootstrap-scripts -m "Module 3.3: Terraform GitHub Actions workflow"
-> git push origin module-3.3-bootstrap-scripts
+> git tag -a module-3.2-bootstrap-scripts -m "Module 3.2: Add bootstrap scripts to infra repo"
+> git push origin module-3.2-bootstrap-scripts
 > ```
 
 ### Understanding the Bootstrap Scripts
@@ -463,13 +463,22 @@ kubectl apply -f ~/devops/zenpharma/gitops/argocd/projects/pharma-project.yaml
 > - **Security boundary:** The `pharma` project restricts which repositories and namespaces ArgoCD Applications can use. An Application in this project cannot deploy to `kube-system` or pull from an unauthorized repo.
 > - **Multi-tenancy:** In a shared cluster, each team gets their own AppProject with its own permissions. This prevents one team from accidentally deploying into another team's namespace.
 
-Commit this file to the gitops repo:
+Commit this file to the gitops repo via a feature branch and pull request:
 
 ```bash
 cd ~/devops/zenpharma/gitops
+git checkout -b feat/argocd-project
 git add argocd/projects/pharma-project.yaml
 git commit -m "feat: add ArgoCD pharma AppProject"
-git push origin main
+git push origin feat/argocd-project
+```
+
+Then create a pull request and merge it:
+
+```bash
+gh pr create --title "feat: add ArgoCD pharma AppProject" \
+  --body "Adds the pharma AppProject manifest for ArgoCD" --base main
+gh pr merge --merge
 ```
 
 ### Step 4: Access the ArgoCD UI
@@ -516,9 +525,10 @@ The script asks for 4 inputs:
 | **GitHub username** | Your GitHub username (the same one from Step 2) |
 | **GitHub PAT token** | The token you created in Step 1 (input is hidden) |
 
-> **Tag `infra` repo: `module-3.4-argocd-bootstrap`**
+> **Tag `gitops` repo: `module-3.4-argocd-bootstrap`**
 > ```bash
-> cd ~/devops/zenpharma/infra
+> cd ~/devops/zenpharma/gitops
+> git checkout main && git pull origin main
 > git tag -a module-3.4-argocd-bootstrap -m "Module 3.4: ArgoCD bootstrapped with gitops repo"
 > git push origin module-3.4-argocd-bootstrap
 > ```
@@ -763,6 +773,8 @@ The script asks for 4 values:
 
 These are the same values you used in the manual steps above — the account ID and role name combine to form the IRSA role ARN from Step 2, and the region is used in the ClusterSecretStore from Step 3.
 
+> **No tag needed** — section 3.5 has no code committed to a repo (all kubectl runtime commands).
+
 ---
 
 ## Module 3 Summary
@@ -770,6 +782,7 @@ These are the same values you used in the manual steps above — the account ID 
 | What We Built | Details |
 |--------------|---------|
 | **EKS Cluster** | Recreated from Terraform (same as Module 1, now via CI/CD or local apply) |
+| **Bootstrap Scripts** | 6 Python scripts added to infra repo for automated cluster setup |
 | **AWS Load Balancer Controller** | Helm chart in `kube-system`, watches Ingress resources, creates AWS ALBs via IRSA |
 | **ArgoCD** | Helm chart in `argocd` namespace, GitOps CD controller with gitops repo registered |
 | **External Secrets Operator** | Helm chart in `external-secrets` namespace, syncs AWS Secrets Manager into K8s Secrets |
@@ -778,6 +791,7 @@ These are the same values you used in the manual steps above — the account ID 
 
 | Tag | Repos |
 |-----|-------|
-| `module-3.4-argocd-bootstrap` | infra |
+| `module-3.2-bootstrap-scripts` | infra |
+| `module-3.4-argocd-bootstrap` | gitops |
 
 > **Next:** [Module 4 — Dockerize & Build CI/CD for Frontend](MODULE-4-DOCKERIZE-AND-BUILD-CICD-FOR-FRONTEND.md)

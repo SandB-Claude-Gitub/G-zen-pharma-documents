@@ -226,28 +226,48 @@ gh --version
 
 ### 3.1 Recreate Infrastructure
 - Re-run Terraform apply (via GitHub Actions or locally)
-- Configure kubectl: `aws eks update-kubeconfig --name pharma-dev --region us-east-1`
+- Configure kubectl: `aws eks update-kubeconfig --name pharma-dev-cluster --region us-east-1`
 - Verify: `kubectl get nodes`
 
-### 3.2 Understanding the Bootstrap Scripts
-- Walk through the 6 Python scripts and what each does:
+### 3.2 Add Bootstrap Scripts to the Infra Repo
+- Create feature branch `feat/bootstrap-scripts` (main is protected)
+- Copy 6 Python scripts into `scripts/` directory:
   1. `01_install_prerequisites.py` — installs AWS LB Controller, ArgoCD, External Secrets Operator
   2. `02_bootstrap_argocd.py` — configures ArgoCD with gitops repo access
   3. `03_setup_external_secrets.py` — creates SecretStore + ExternalSecret resources
   4. `04_run_pipeline.py` — triggers CI pipelines to build images
   5. `05_deploy_services.py` — creates ArgoCD Application resources
   6. `06_verify_deployment.py` — health checks all services
+- Push and raise PR to merge into main (changes outside `envs/dev/` and `modules/` won't trigger Terraform workflow)
 
-### 3.3 Install AWS Load Balancer Controller, ArgoCD, and External Secrets Operator
-- Run `01_install_prerequisites.py`
-- **Explain:** what each tool does:
-  - **AWS LB Controller:** watches Ingress resources → creates ALBs in AWS
-  - **ArgoCD:** watches gitops repo → syncs Kubernetes state to match
-  - **External Secrets Operator:** watches ExternalSecret CRDs → syncs AWS Secrets Manager into K8s Secrets
+> **Tag `infra` repo: `module-3.2-bootstrap-scripts`**
+
+### 3.3 Install Cluster Prerequisites
+- Walk through manual Helm installs first (learn each command), then show the automated script
+- Install **AWS Load Balancer Controller** — watches Ingress resources → creates ALBs in AWS
+- Install **ArgoCD** — watches gitops repo → syncs Kubernetes state to match
+- Install **External Secrets Operator** — watches ExternalSecret CRDs → syncs AWS Secrets Manager into K8s Secrets
 - **Explain:** Helm charts, Helm values, IRSA annotation on service accounts
 - Verify: `kubectl get pods -n kube-system`, `kubectl get pods -n argocd`, `kubectl get pods -n external-secrets`
+- **Automated:** `python3 infra/scripts/01_install_prerequisites.py`
 
-> **Tag `infra` repo: `module-3.3-cluster-bootstrap`**
+### 3.4 Bootstrap ArgoCD
+- Create GitHub PAT (fine-grained, read-only on gitops repo)
+- Register gitops repo in ArgoCD via labeled Kubernetes Secret
+- Create `pharma` AppProject manifest in gitops repo (`argocd/projects/pharma-project.yaml`)
+- Push via feature branch `feat/argocd-project` + PR to main on gitops repo
+- Access ArgoCD UI via port-forward, verify repo and project are visible
+- **Automated:** `python3 infra/scripts/02_bootstrap_argocd.py`
+
+> **Tag `gitops` repo: `module-3.4-argocd-bootstrap`**
+
+### 3.5 Setup External Secrets
+- Create `dev` namespace
+- Annotate ESO service account with IRSA role ARN
+- Create ClusterSecretStore pointing to AWS Secrets Manager
+- Create ExternalSecrets for `db-credentials` and `jwt-secret`
+- Verify: `kubectl get clustersecretstore`, `kubectl get externalsecret -n dev`
+- **Automated:** `python3 infra/scripts/03_setup_external_secrets.py`
 
 ---
 
@@ -626,7 +646,8 @@ git push origin <tag-name>
 | 2.3 | `module-2.3-github-secrets` | infra |
 | 2.4 | `module-2.4-branch-protection` | infra |
 | 2.5 | `module-2.5-infra-via-ci` | infra |
-| 3.3 | `module-3.3-cluster-bootstrap` | infra |
+| 3.2 | `module-3.2-bootstrap-scripts` | infra |
+| 3.4 | `module-3.4-argocd-bootstrap` | gitops |
 | 4.1 | `module-4.1-dockerfile` | frontend |
 | 4.2 | `module-4.2-branching` | frontend |
 | 4.4 | `module-4.4-ci-workflows` | frontend |
