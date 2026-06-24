@@ -269,6 +269,17 @@ gh --version
 - Verify: `kubectl get clustersecretstore`, `kubectl get externalsecret -n dev`
 - **Automated:** `python3 infra/scripts/03_setup_external_secrets.py`
 
+### 3.6 Destroy Infrastructure
+- **Pre-destroy cleanup required** — first module where Helm/K8s resources exist outside Terraform
+  1. Delete ExternalSecrets and ClusterSecretStore
+  2. Uninstall Helm charts (ESO, ArgoCD, ALB Controller)
+  3. Delete namespaces (`argocd`, `external-secrets`, `dev`)
+  4. Wait for ALBs to fully delete (2–3 min)
+- Run `terraform destroy` via GitHub Actions or locally
+- **Explain:** why pre-cleanup is needed (ALBs block VPC deletion), destroy order matters
+
+> *End of Module 3 — Infrastructure is destroyed. Recreate it before Module 4.*
+
 ---
 
 ## Module 4 — Frontend: Docker & CI/CD Pipeline

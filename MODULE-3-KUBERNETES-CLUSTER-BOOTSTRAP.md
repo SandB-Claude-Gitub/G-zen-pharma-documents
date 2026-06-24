@@ -777,6 +777,81 @@ These are the same values you used in the manual steps above — the account ID 
 
 ---
 
+## 3.6 Destroy Infrastructure
+
+Unlike Modules 1 and 2, we now have resources running **inside** the cluster that were created outside of Terraform — Helm charts (ALB Controller, ArgoCD, External Secrets Operator), Kubernetes namespaces, and ExternalSecrets. These must be cleaned up **before** running `terraform destroy`, or Terraform will hang waiting for VPC subnets and security groups to be released.
+
+### Step 1: Delete ExternalSecrets and ClusterSecretStore
+
+```bash
+kubectl delete externalsecret --all -n dev
+kubectl delete clustersecretstore aws-secrets-manager
+```
+
+### Step 2: Uninstall Helm Charts
+
+Remove in reverse order of installation:
+
+```bash
+helm uninstall external-secrets -n external-secrets
+helm uninstall argocd -n argocd
+helm uninstall aws-load-balancer-controller -n kube-system
+```
+
+### Step 3: Delete Namespaces
+
+```bash
+kubectl delete namespace argocd external-secrets dev --ignore-not-found
+```
+
+### Step 4: Verify No ALBs Remain
+
+ALBs created by the ALB Controller are AWS resources that block VPC deletion. Wait 2–3 minutes for them to fully delete:
+
+```bash
+aws elbv2 describe-load-balancers --region us-east-1 \
+  --query "LoadBalancers[].LoadBalancerArn" --output text
+```
+
+If any ALBs are listed, wait and check again. **Do NOT proceed until ALBs are gone.**
+
+> **Why?** The ALB Controller creates Elastic Network Interfaces (ENIs) in your VPC subnets. If ALBs exist when Terraform deletes the VPC, it will hang with "subnet has dependencies" errors.
+
+### Step 5: Run Terraform Destroy
+
+**Option A: GitHub Actions (recommended)**
+
+1. Go to `infra` repo → **Actions** → **Terraform Infrastructure**
+2. Click **Run workflow**
+3. Select `destroy` from the action dropdown
+4. Type `destroy` in the confirmation field
+5. Click **Run workflow** → Approve in the `dev` environment gate
+
+**Option B: Local Terraform**
+
+```bash
+cd ~/devops/zenpharma/infra/envs/dev
+terraform destroy
+```
+
+Type `yes` when prompted. This takes 10–15 minutes.
+
+### Step 6: Verify Cleanup
+
+```bash
+aws eks list-clusters --region us-east-1
+aws rds describe-db-instances --region us-east-1 \
+  --query 'DBInstances[].DBInstanceIdentifier'
+aws ec2 describe-vpcs --region us-east-1 \
+  --query 'Vpcs[?Tags].VpcId'
+```
+
+All should return empty results.
+
+> **End of Module 3.** Infrastructure is destroyed. Recreate it before Module 4.
+
+---
+
 ## Module 3 Summary
 
 | What We Built | Details |
