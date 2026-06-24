@@ -864,37 +864,11 @@ Apply complete! Resources: XX added, 0 changed, 0 destroyed.
 
 ## 2.6 Destroy Infrastructure via GitHub Actions
 
-When you're done working or want to save costs, you can tear down all infrastructure. But first, you must clean up resources created outside of Terraform.
+When you're done working or want to save costs, you can tear down all infrastructure. At this point in the course, only Terraform-managed resources exist (VPC, EKS, RDS, ECR, IAM, Secrets Manager) — no Helm charts or ArgoCD apps have been deployed yet, so a simple `terraform destroy` is all that's needed.
 
-### Step 1: Pre-Destroy Cleanup (Run Locally)
+> **Note:** In later modules (after Helm charts and ArgoCD are installed), you will need to clean up those resources first before running destroy. That process is covered when we reach those modules.
 
-Before triggering the Terraform destroy, clean up Helm-installed resources and ALBs from your local terminal. These were created outside of Terraform and will block the destroy if left behind:
-
-```bash
-# 1. Delete all ArgoCD applications (removes pods, services, ingresses)
-kubectl delete applications --all -n argocd
-
-# 2. Delete all ingresses (triggers ALB deletion)
-kubectl delete ingress --all -n dev
-kubectl delete ingress --all -n qa 2>/dev/null
-kubectl delete ingress --all -n prod 2>/dev/null
-
-# 3. Uninstall Helm charts
-helm uninstall external-secrets -n external-secrets
-helm uninstall argocd -n argocd
-helm uninstall aws-load-balancer-controller -n kube-system
-
-# 4. Delete namespaces
-kubectl delete namespace argocd external-secrets dev qa prod --ignore-not-found
-
-# 5. Wait 2-3 minutes for ALBs to fully delete, then verify
-aws elbv2 describe-load-balancers --region us-east-1 \
-  --query "LoadBalancers[].LoadBalancerArn" --output text
-```
-
-> **Why?** ALBs are created by the ALB Controller (a Helm chart), not by Terraform. If ALBs exist when Terraform tries to delete the VPC, it will hang with "subnet has dependencies" errors. Always clean up Helm-managed resources before running Terraform destroy.
-
-### Step 2: Navigate to the Workflow
+### Step 1: Navigate to the Workflow
 
 1. Go to your infra repository: `https://github.com/zenpharma/infra`
 2. Click the **Actions** tab

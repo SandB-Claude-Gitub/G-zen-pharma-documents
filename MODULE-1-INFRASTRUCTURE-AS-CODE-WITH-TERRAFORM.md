@@ -2223,65 +2223,9 @@ You should see 3 nodes (matching `desired_size = 3`).
 
 ## 1.10 Destroy Infrastructure
 
-Before running `terraform destroy`, you must clean up resources that were created **outside of Terraform** (Helm charts, ArgoCD apps, Kubernetes resources). If you skip this, Terraform destroy will hang or fail because these resources hold references to AWS infrastructure (ALBs, security groups, ENIs).
+At the end of Module 1, we have only run Terraform — no Helm charts, no ArgoCD, no Kubernetes workloads have been deployed yet. The destroy is straightforward.
 
-### Step 1: Delete ArgoCD Applications
-
-ArgoCD-managed applications create Kubernetes resources (Deployments, Services, Ingresses) which in turn create AWS resources (ALBs via the ALB Controller). Delete them first:
-
-```bash
-# Delete all ArgoCD applications
-kubectl delete applications --all -n argocd
-
-# Verify no applications remain
-kubectl get applications -n argocd
-```
-
-Wait 1-2 minutes for ArgoCD to clean up the resources it created (pods, services, ingresses, ALBs).
-
-### Step 2: Delete ALBs and Ingresses
-
-The AWS Load Balancer Controller creates ALBs when it sees Ingress resources. These ALBs are AWS resources that Terraform doesn't know about — they will block VPC/subnet deletion if left behind:
-
-```bash
-# Delete all ingresses (this triggers ALB Controller to delete the ALBs)
-kubectl delete ingress --all -n dev
-kubectl delete ingress --all -n qa 2>/dev/null
-kubectl delete ingress --all -n prod 2>/dev/null
-
-# Verify ALBs are being deleted (this takes 1-2 minutes)
-kubectl get ingress -A
-```
-
-> **Why?** ALBs create Elastic Network Interfaces (ENIs) in your VPC subnets. If ALBs exist when Terraform tries to delete the VPC, Terraform will hang with "subnet has dependencies" errors.
-
-### Step 3: Uninstall Helm Charts
-
-Remove the Helm-installed components (ALB Controller, ArgoCD, External Secrets Operator):
-
-```bash
-# Uninstall in reverse order of installation
-helm uninstall external-secrets -n external-secrets
-helm uninstall argocd -n argocd
-helm uninstall aws-load-balancer-controller -n kube-system
-
-# Delete the namespaces
-kubectl delete namespace argocd external-secrets dev qa prod --ignore-not-found
-```
-
-### Step 4: Wait and Verify AWS Cleanup
-
-Wait 2-3 minutes for AWS to fully delete the ALBs and their associated resources:
-
-```bash
-# Check no ALBs remain in your VPC
-aws elbv2 describe-load-balancers --region us-east-1 \
-  --query "LoadBalancers[?VpcId=='<your-vpc-id>'].LoadBalancerArn" --output text
-```
-
-If ALBs are still listed, wait and check again. Do NOT run `terraform destroy` until ALBs are gone.
-
-### Step 5: Run Terraform Destroy
+### Step 1: Run Terraform Destroy
 
 ```bash
 cd ~/devops/zenpharma/infra/envs/dev
@@ -2290,29 +2234,31 @@ terraform destroy
 
 Type `yes` when prompted.
 
-**This will take 10-15 minutes** (EKS and NAT Gateway take the longest to delete).
+**This will take 10–15 minutes** — EKS clusters and NAT Gateways are the slowest to delete.
 
 **Expected output:**
 ```
 Destroy complete! Resources: XX destroyed.
 ```
 
-> **If Terraform hangs:** It's usually waiting for a subnet or security group to be released. Check for leftover ALBs or ENIs in the AWS Console (EC2 → Network Interfaces, filter by VPC ID). Delete any orphaned ENIs manually, then Terraform will proceed.
-
-### Step 6: Verify Cleanup
+### Step 2: Verify Cleanup
 
 ```bash
 # Check no EKS clusters remain
 aws eks list-clusters --region us-east-1
 
 # Check no RDS instances remain
-aws rds describe-db-instances --region us-east-1 --query 'DBInstances[].DBInstanceIdentifier'
+aws rds describe-db-instances --region us-east-1 \
+  --query 'DBInstances[].DBInstanceIdentifier'
 
-# Check no ALBs remain
-aws elbv2 describe-load-balancers --region us-east-1 --query 'LoadBalancers[].LoadBalancerArn'
+# Check no VPCs remain (besides the default VPC)
+aws ec2 describe-vpcs --region us-east-1 \
+  --query 'Vpcs[?Tags].VpcId'
 ```
 
 All should return empty results.
+
+> **Note:** In later modules (after Helm charts and ArgoCD are installed), the destroy process requires extra pre-cleanup steps. That is covered in Module 2.6.
 
 > **End of Module 1.** Infrastructure is destroyed. In Module 2, we'll recreate it through GitHub Actions instead of running Terraform locally.
 

@@ -212,20 +212,11 @@ gh --version
 > **Tag `infra` repo: `module-2.5-infra-via-ci`**
 
 ### 2.6 Destroy Infrastructure via GitHub Actions
-- **Step 1 — Pre-destroy cleanup (run locally):** Delete ArgoCD apps, ingresses, and Helm charts before triggering destroy — ALBs created by the ALB Controller will block VPC deletion if left behind
-  ```bash
-  kubectl delete applications --all -n argocd
-  kubectl delete ingress --all -n dev
-  helm uninstall external-secrets -n external-secrets
-  helm uninstall argocd -n argocd
-  helm uninstall aws-load-balancer-controller -n kube-system
-  kubectl delete namespace argocd external-secrets dev qa prod --ignore-not-found
-  # Wait 2-3 minutes for ALBs to fully delete before proceeding
-  ```
-- **Step 2 — Trigger destroy:** Use `workflow_dispatch` with `action: destroy` and `confirm_destroy: "destroy"`
-- **Step 3 — Approve** in the `dev` environment gate
-- **Step 4 — Verify** all resources are cleaned up in AWS Console
-- **Explain:** destroy safety gates, why pre-cleanup is required (ALBs are not managed by Terraform), why we require confirmation
+- At this point only Terraform-managed resources exist — no Helm charts or ArgoCD apps yet, so no pre-cleanup needed
+- Use `workflow_dispatch` with `action: destroy` and `confirm_destroy: "destroy"`
+- Approve in the `dev` environment gate
+- Verify all resources are cleaned up in AWS Console
+- **Explain:** five layers of destroy safety (manual trigger, action selection, confirmation text, `if:` condition, environment approval gate)
 
 > *End of Module 2 — Infrastructure is destroyed. Recreate it before Module 3.*
 
