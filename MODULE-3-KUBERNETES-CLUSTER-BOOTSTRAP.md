@@ -77,6 +77,7 @@ The infra repo needs a set of Python scripts that automate cluster setup tasks (
 
 ```bash
 cd ~/devops/zenpharma/infra
+git checkout -b feat/bootstrap-scripts
 mkdir -p scripts
 ```
 
@@ -103,10 +104,19 @@ ls scripts/
 # Expected: 01_install_prerequisites.py  02_bootstrap_argocd.py  03_setup_external_secrets.py
 #           04_run_pipeline.py  05_deploy_services.py  06_verify_deployment.py
 
-git add scripts/
-git commit -m "feat: add bootstrap scripts for cluster setup"
-git push origin main
+cd ~/devops/zenpharma/infra
+git add envs/dev/main.tf
+git commit -m "Adding bootstrap scripts"
+git push origin feat/bootstrap-scripts
 ```
+Raise a pull request to commit changes onto main. As we are doing changes outside of `envs/dev` and `modules/` it wont trigger a pipeline. 
+
+> **Tag `infra` repo: `module-3.3-bootstrap-scripts`**
+> ```bash
+> cd ~/devops/zenpharma/infra
+> git tag -a module-3.3-bootstrap-scripts -m "Module 3.3: Terraform GitHub Actions workflow"
+> git push origin module-3.3-bootstrap-scripts
+> ```
 
 ### Understanding the Bootstrap Scripts
 
