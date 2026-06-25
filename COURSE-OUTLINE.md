@@ -308,30 +308,33 @@ gh --version
 - Add `GITOPS_REPO` variable (e.g., `zenpharma/gitops`)
 - **Explain:** why the CI pipeline needs write access to a separate repo (GitOps pattern)
 
-### 4.4 Create GitHub Workflows for Pharma-UI
-- **PR workflow** (runs on pull_request to `main`/`develop`):
-  - Lint (ESLint), unit tests (Jest with coverage), security scans (SonarCloud, npm audit)
-  - No Docker build on PRs — fast feedback loop
-- **CI/CD workflow** (`ci-pharma-ui.yml`, runs on push to `develop`/`release/*`):
-  - Lint → Test → Security → Build React app → Docker build → Trivy scan → Push to ECR → Update gitops (dev) → Open QA promotion PR
-- **Reusable workflow** (`_reusable-update-gitops.yml`):
-  - Shared logic for updating image tags in the gitops repo
+### 4.4 Create CI/CD Workflow for Pharma-UI
+- **PR checks** (runs on pull_request to `main`/`develop`):
+  - Lint (ESLint), Unit Tests (Jest with coverage), Code Analysis (SonarCloud, npm audit), Build
+  - No Docker build on PRs — validates code quality without producing deployable artifacts
+- **CI/CD pipeline** (runs on push to `develop`/`release/*`):
+  - Lint → Test → SonarCloud → Build → Docker Build → Trivy Scan → Push to ECR → Deploy DEV (update gitops)
 - **Explain:**
   - Image tag strategy: `sha-<7-char-git-sha>` (immutable, traceable to exact commit)
   - ECR authentication via OIDC (no static AWS keys!) — references the IAM role created in Module 1.7
   - Trivy container vulnerability scanning
-  - Why two workflows (PR vs. merge): PR = quality gate, merge = deploy
+  - SonarCloud project key and org key found under **Project Information** in SonarCloud sidebar
 
-> **Tag `frontend` repo: `module-4.4-ci-workflows`**
+### 4.5 Create QA Promotion Workflow
+- **Promote workflow** (`promote-qa-pharma-ui.yml`, manual `workflow_dispatch`):
+  - Reads current image tag from DEV values file in gitops repo
+  - Opens a PR to update QA values file
+- **Explain:** manual QA promotion keeps gitops repo clean, only validated builds reach QA
 
-### 4.5 Create Production Promotion Workflow
+### 4.6 Create Production Promotion Workflow
 - **Promote workflow** (`promote-prod-pharma-ui.yml`, manual `workflow_dispatch`):
   - Reads current image tag from QA values file
   - Opens a PR to update prod values file in gitops repo
   - Includes pre-merge checklist (QA sign-off, change ticket, runbook)
 - **Explain:** manual promotion as a safety gate, PROD ArgoCD requires manual sync after merge
+- **Commit all 3 workflows** (`ci-pharma-ui.yml`, `promote-qa-pharma-ui.yml`, `promote-prod-pharma-ui.yml`) as a single commit
 
-> **Tag `frontend` repo: `module-4.5-promote-workflow`**
+> **Tag `frontend` repo: `module-4.4-ci-workflows`**
 
 ---
 
@@ -662,7 +665,6 @@ git push origin <tag-name>
 | 4.1 | `module-4.1-dockerfile` | frontend |
 | 4.2 | `module-4.2-branching` | frontend |
 | 4.4 | `module-4.4-ci-workflows` | frontend |
-| 4.5 | `module-4.5-promote-workflow` | frontend |
 | 5.1 | `module-5.1-repo-structure` | gitops |
 | 5.2 | `module-5.2-argocd-config` | gitops |
 | 5.3 | `module-5.3-namespaces` | gitops |

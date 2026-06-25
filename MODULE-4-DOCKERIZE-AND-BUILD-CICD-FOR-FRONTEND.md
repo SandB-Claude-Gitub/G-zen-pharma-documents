@@ -348,7 +348,7 @@ SonarCloud enables **Automatic Analysis** by default on new projects. This confl
 **How to find the Organization Key and Project Key:**
 
 1. Go to your project page on SonarCloud
-2. Click **Information** (bottom of the left sidebar)
+2. Click **Project Information** (bottom of the left sidebar)
 3. You will see both values:
    - **Organization Key** — typically your GitHub org name in lowercase (e.g., `zenpharma`)
    - **Project Key** — typically in the format `<org>_<repo>` (e.g., `zenpharma_frontend`)
@@ -382,7 +382,7 @@ This is the core of Module 4. We will create a single CI/CD workflow file that h
 
 | Trigger | What Runs | Why |
 |---------|-----------|-----|
-| `pull_request` to `main` or `develop` | Lint, Test, SonarCloud | Fast feedback for the developer. No Docker build, no ECR push, no deployment. PRs should never produce artifacts. |
+| `pull_request` to `main` or `develop` | Lint, Test, SonarCloud, Build | Full quality checks including build verification. No Docker build, no ECR push, no deployment. PRs should never produce deployable artifacts. |
 | `push` to `develop` or `release/*` | Lint, Test, SonarCloud, Build, Docker Build, Trivy Scan, ECR Push, Deploy to DEV | A merge to `develop` means the code is reviewed and approved. Now we build, scan, push, and deploy. |
 
 We use `if:` conditions on the Docker/deploy jobs to control which jobs run for each trigger type.
@@ -863,22 +863,7 @@ This job checks out the gitops repository, uses `yq` to update the image tag in 
 
 > **What about promoting to QA?** The CI pipeline only deploys to DEV. QA and PROD promotions are handled by separate manual workflows (covered in sections 4.5 and 4.6). This keeps the default pipeline fast and avoids cluttering the gitops repo with PRs for every dev build.
 
-### Step 3: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/frontend
-git checkout develop
-git add .github/workflows/ci-pharma-ui.yml
-git commit -m "ci: add CI/CD workflow for pharma-ui"
-git push
-```
-
-> **Tag `frontend` repo: `module-4.4-ci-workflows`**
->
-> ```bash
-> git tag -a module-4.4-ci-workflows -m "Module 4.4: CI/CD workflow for pharma-ui with lint, test, SonarCloud, Docker build, and GitOps deployment"
-> git push origin module-4.4-ci-workflows
-> ```
+> **Don't commit yet** — we will commit this workflow along with the QA and PROD promotion workflows as a single commit in section 4.6.
 
 ---
 
@@ -1033,22 +1018,7 @@ Manual trigger: "Promote pharma-ui to PROD" workflow
 Opens PR in gitops repo → review → merge → ArgoCD syncs PROD
 ```
 
-### Step 3: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/frontend
-git checkout develop
-git add .github/workflows/promote-qa-pharma-ui.yml
-git commit -m "ci: add manual QA promotion workflow for pharma-ui"
-git push
-```
-
-> **Tag `frontend` repo: `module-4.5-promote-qa-workflow`**
->
-> ```bash
-> git tag -a module-4.5-promote-qa-workflow -m "Module 4.5: Manual QA promotion workflow for pharma-ui"
-> git push origin module-4.5-promote-qa-workflow
-> ```
+> **Don't commit yet** — we will commit this workflow along with the CI and PROD promotion workflows as a single commit in section 4.6.
 
 ---
 
@@ -1224,21 +1194,25 @@ Operator triggers manual sync in ArgoCD
 PROD deployment rolls out
 ```
 
-### Step 3: Commit and Push
+### Step 3: Commit and Push All Workflows
+
+Now commit all three workflow files (CI/CD, QA promotion, PROD promotion) as a single commit:
 
 ```bash
 cd ~/devops/zenpharma/frontend
 git checkout develop
+git add .github/workflows/ci-pharma-ui.yml
+git add .github/workflows/promote-qa-pharma-ui.yml
 git add .github/workflows/promote-prod-pharma-ui.yml
-git commit -m "ci: add production promotion workflow for pharma-ui"
+git commit -m "ci: add CI/CD pipeline and promotion workflows for pharma-ui"
 git push
 ```
 
-> **Tag `frontend` repo: `module-4.6-promote-prod-workflow`**
+> **Tag `frontend` repo: `module-4.4-ci-workflows`**
 >
 > ```bash
-> git tag -a module-4.6-promote-prod-workflow -m "Module 4.6: Production promotion workflow for pharma-ui"
-> git push origin module-4.6-promote-prod-workflow
+> git tag -a module-4.4-ci-workflows -m "Module 4.4: CI/CD pipeline, QA and PROD promotion workflows for pharma-ui"
+> git push origin module-4.4-ci-workflows
 > ```
 
 ---
@@ -1260,7 +1234,5 @@ git push
 |-----|------|
 | `module-4.1-dockerfile` | frontend |
 | `module-4.4-ci-workflows` | frontend |
-| `module-4.5-promote-qa-workflow` | frontend |
-| `module-4.6-promote-prod-workflow` | frontend |
 
 > **Next:** [Module 5 — GitOps Repository & Helm Charts](MODULE-5-GITOPS-REPOSITORY-AND-HELM-CHARTS.md)
