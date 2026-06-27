@@ -136,21 +136,7 @@ kubectl get namespaces
 
 You should see `dev` in the list alongside `default`, `kube-system`, and other system namespaces.
 
-### Step 3: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/gitops
-git add k8s/namespaces.yaml
-git commit -m "feat: add dev namespace definition"
-git push origin main
-```
-
-> **Tag `gitops` repo: `module-5.3-namespaces`**
-> ```bash
-> cd ~/devops/zenpharma/gitops
-> git tag -a module-5.3-namespaces -m "Module 5.3: Kubernetes namespace definitions"
-> git push origin module-5.3-namespaces
-> ```
+> **Don't commit yet** — we will commit the namespace manifest along with the DB init script and raw manifests as a single commit in section 5.4.
 
 ---
 
@@ -192,21 +178,7 @@ GRANT ALL PRIVILEGES ON SCHEMA reporting TO pharmaadmin;
 
 > **When do we run this SQL?** Not now — we just create the file here and commit it. The actual database initialization happens in **Module 6 (section 6.2)** after the infrastructure is up and running. The RDS instance must be reachable from the cluster before we can connect to it.
 
-### Step 2: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/gitops
-git add db-init/01-schemas.sql
-git commit -m "feat: add database schema initialization script"
-git push origin main
-```
-
-> **Tag `gitops` repo: `module-5.4-db-init`**
-> ```bash
-> cd ~/devops/zenpharma/gitops
-> git tag -a module-5.4-db-init -m "Module 5.4: Database initialization script"
-> git push origin module-5.4-db-init
-> ```
+> **Don't commit yet** — we will commit the DB init script along with the namespace manifest and raw manifests as a single commit in section 5.4.
 
 ---
 
@@ -495,11 +467,21 @@ Now imagine you need to change the health check path across all services. You'd 
 
 > **This is why we use Helm.** One chart template + one values file per service per environment. Instead of 108 files, we have 7 templates + 27 values files = 34 files. And the templates enforce consistency — change a pattern once, it applies everywhere.
 
+### Commit All Raw Kubernetes Files
+
+Now commit everything from sections 5.2, 5.3, and 5.4 as a single commit:
+
+```bash
+cd ~/devops/zenpharma/gitops
+git add k8s/namespaces.yaml db-init/01-schemas.sql k8s/raw-manifests/
+git commit -m "feat: add namespace, DB init script, and raw K8s manifests for pharma-ui"
+git push origin main
+```
+
 > **Tag `gitops` repo: `module-5.4-raw-manifests`**
 > ```bash
 > cd ~/devops/zenpharma/gitops
-> git add k8s/raw-manifests/
-> git commit -m "feat: add raw Kubernetes manifests for pharma-ui (before Helm conversion)"
+> git tag -a module-5.4-raw-manifests -m "Module 5.4: Namespace, DB init, and raw Kubernetes manifests"
 > git push origin module-5.4-raw-manifests
 > ```
 
@@ -1691,8 +1673,6 @@ git push origin main
 | Tag | Repo |
 |-----|------|
 | `module-5.1-repo-structure` | gitops |
-| `module-5.3-namespaces` | gitops |
-| `module-5.4-db-init` | gitops |
 | `module-5.4-raw-manifests` | gitops |
 | `module-5.6-helm-chart` | gitops |
 | `module-5.7-pharma-ui-values` | gitops |
