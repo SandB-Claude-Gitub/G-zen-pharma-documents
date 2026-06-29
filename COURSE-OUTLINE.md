@@ -373,32 +373,26 @@ gh --version
 
 > **Tag `gitops` repo: `module-5.1-repo-structure`**
 
-### 5.2 Add ArgoCD Configuration
-- Add `argocd/projects/pharma-project.yaml` — ArgoCD AppProject scoping allowed sources and destinations
-- Add `argocd/install/argocd-namespace.yaml` and `argocd-ingress.yaml`
-- **Explain:** AppProject as a security boundary, source restrictions, destination restrictions
-
-> **Tag `gitops` repo: `module-5.2-argocd-config`**
-
-### 5.3 Create Kubernetes Namespace Definitions
-- Add `k8s/namespaces.yaml` — create namespaces for dev, qa, prod
+### 5.2 Add Kubernetes Namespace Definitions
+- Add `k8s/namespaces.yaml` — create `dev` namespace
 - **Explain:** namespace isolation, resource quotas (optional)
 
-> **Tag `gitops` repo: `module-5.3-namespaces`**
+### 5.3 Add Database Initialization Script
+- Add `db-init/01-schemas.sql` — SQL file for per-service schemas (auth, drug_catalog, inventory, manufacturing, quality_control, supplier, etc.)
+- **Note:** we only create the file here — the SQL is executed in Module 6 after infrastructure is running
+- **Explain:** schema-per-service pattern
 
-### 5.4 Add Database Initialization Script
-- Add `db-init/01-schemas.sql` — creates per-service schemas in PostgreSQL (auth, drug_catalog, inventory, manufacturing, quality_control, supplier, etc.)
-- **Explain:** schema-per-service pattern, how to apply this to RDS (connect via kubectl port-forward or bastion)
+### 5.4 Deploy Pharma-UI with Raw Kubernetes Manifests
+- Create raw manifests in `k8s/raw-manifests/dev/`: ServiceAccount, Deployment, Service, Ingress, ConfigMap
+- Apply with `kubectl apply` to understand how each resource works
+- Clean up raw manifests before Helm deployment
+- **Explain:** the manifest explosion problem — 9 services x 3 environments x 5 files = 135 YAML files
+- **Commit all together:** namespace manifest, DB init script, and raw manifests as a single commit
 
-> **Tag `gitops` repo: `module-5.4-db-init`**
+> **Tag `gitops` repo: `module-5.4-raw-manifests`**
 
-### 5.5 Write Raw Kubernetes Manifests for Pharma-UI (Conceptual)
-- Show what raw manifests look like: Deployment, Service, Ingress, ConfigMap
-- **Explain:** the problem — copy-paste across 9 services and 3 environments = 27+ files to maintain
-
-### 5.6 Convert to a Shared Helm Chart
-- Create `helm-charts/` — the generic chart with templates
-- Walk through each template:
+### 5.5 Create the Shared Helm Chart
+- Create `helm-charts/` — one generic chart with templates:
   - `deployment.yaml` — image, probes, resources, security context
   - `service.yaml` — ClusterIP
   - `ingress.yaml` — AWS ALB via annotation (conditional on `ingress.enabled`)
@@ -408,9 +402,9 @@ gh --version
   - `_helpers.tpl` — naming conventions
 - **Explain:** Helm templating, values override hierarchy, `fullnameOverride`
 
-> **Tag `gitops` repo: `module-5.6-helm-chart`**
+> **Tag `gitops` repo: `module-5.5-helm-chart`**
 
-### 5.7 Add Pharma-UI Values File for Dev Environment
+### 5.6 Add Pharma-UI Values File for Dev Environment
 - Create `envs/dev/values-pharma-ui.yaml` with:
   - ECR image repository and tag
   - Ingress enabled with ALB annotations (`alb.ingress.kubernetes.io/scheme: internet-facing`)
@@ -420,9 +414,16 @@ gh --version
   - Volume mounts for Nginx (tmp, cache, run — required for `readOnlyRootFilesystem: true`)
 - **Explain:** how the values file overrides the generic chart, ALB ingress annotations
 
-> **Tag `gitops` repo: `module-5.7-pharma-ui-values`**
+> **Tag `gitops` repo: `module-5.6-pharma-ui-values`**
 
-### 5.8 Add ArgoCD Application Manifest for Pharma-UI (Dev)
+### 5.7 Add ArgoCD Configuration
+- Add `argocd/projects/pharma-project.yaml` — ArgoCD AppProject scoping allowed sources and destinations
+- Add `argocd/install/argocd-ingress.yaml` — ALB ingress for ArgoCD UI
+- **Explain:** AppProject as a security boundary, source restrictions, destination restrictions
+
+> **Tag `gitops` repo: `module-5.7-argocd-config`**
+
+### 5.8 Create ArgoCD Application Manifest for Pharma-UI (Dev)
 - Create `argocd/apps/dev/pharma-ui-app.yaml`
 - **Explain:** ArgoCD Application CRD — source (gitops repo + path + values file), destination (cluster + namespace), sync policy (auto vs. manual)
 
