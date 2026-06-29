@@ -7,7 +7,7 @@
 
 ## 7.1 Overview of Backend Architecture
 
-In Module 4 we deployed the frontend (pharma-ui). The frontend shows a login screen and navigation, but every API call fails because there are no backend services running yet. In this module we Dockerize all 8 backend microservices, create CI/CD pipelines, and deploy them to the EKS cluster.
+In Module 6 we deployed the frontend (pharma-ui). The frontend shows a login screen and navigation, but every API call fails because there are no backend services running yet. In this module we Dockerize all 8 backend microservices, create CI/CD pipelines, and deploy them to the EKS cluster.
 
 ### The 8 Microservices
 
@@ -24,21 +24,26 @@ In Module 4 we deployed the frontend (pharma-ui). The frontend shows a login scr
 
 ### API Gateway Pattern
 
-All external traffic enters through the **api-gateway** service. The frontend sends requests to `/api/*`, and the ALB Ingress routes those to api-gateway. The api-gateway then routes to the appropriate internal service based on the URL path:
+All services share the same ALB (via the `pharma-dev` ingress group). The ALB routes traffic based on the URL path — `/api/*` goes to api-gateway, and everything else (`/`) goes to pharma-ui. The api-gateway then routes to the appropriate internal service:
 
 ```
-Browser → ALB → api-gateway (8080) → auth-service (8081)
-                                    → drug-catalog-service (8082)
-                                    → inventory-service (8083)
-                                    → supplier-service (8084)
-                                    → manufacturing-service (8085)
-                                    → qc-service (8086)
-                                    → notification-service (3000)
+                          ┌─ /     → pharma-ui (80)        ← React app (Nginx)
+Browser → ALB (pharma-dev)│
+                          └─ /api/ → api-gateway (8080)    ← Spring Boot gateway
+                                        → auth-service (8081)
+                                        → drug-catalog-service (8082)
+                                        → inventory-service (8083)
+                                        → supplier-service (8084)
+                                        → manufacturing-service (8085)
+                                        → qc-service (8086)
+                                        → notification-service (3000)
 ```
+
+Pharma-ui is a static React app served by Nginx. It makes API calls to `/api/*`, which the ALB routes to api-gateway. The api-gateway then forwards to the correct backend service based on the path.
 
 > **Why an API Gateway?**
 > - Single entry point simplifies security (one place for auth, rate limiting, CORS)
-> - Frontend only needs to know one URL, not 7 different service endpoints
+> - Frontend only needs to know one URL (`/api`), not 7 different service endpoints
 > - Cross-cutting concerns (logging, tracing, circuit breakers) live in one place
 > - In production, you might replace this with AWS API Gateway or Kong, but a Spring Boot gateway works well for learning
 
@@ -196,7 +201,21 @@ EOF
 echo "Created notification-service/Dockerfile"
 ```
 
-> **Don't commit yet** — we will commit all Dockerfiles and workflows together as a single commit in section 7.5.
+### Step 3: Commit and Push Dockerfiles
+
+```bash
+cd ~/devops/zenpharma/backend
+git add */Dockerfile
+git commit -m "feat: add Dockerfiles for all 8 backend microservices"
+git push
+```
+
+> **Tag `backend` repo: `module-7.2-dockerfiles`**
+>
+> ```bash
+> git tag -a module-7.2-dockerfiles -m "Module 7.2: Dockerfiles for all 8 backend microservices"
+> git push origin module-7.2-dockerfiles
+> ```
 
 ---
 
@@ -980,23 +999,22 @@ jobs:
 
 > **Note:** QA promotion for backend services uses the same manual workflow pattern. Create a `promote-qa.yml` workflow (similar to `promote-prod.yml`) with a service dropdown. The workflow reads the image tag from `envs/dev/values-<service>.yaml` and opens a PR to update `envs/qa/values-<service>.yaml`.
 
-### Step 2: Commit All Dockerfiles and Workflows
+### Step 2: Commit All Workflows
 
-Now commit everything from sections 7.2–7.5 as a single commit — all Dockerfiles, reusable workflows, per-service workflows, and the promotion workflow:
+Now commit all workflow files from sections 7.3–7.5 as a single commit — reusable workflows, per-service CI/CD and PR check workflows, and the promotion workflow:
 
 ```bash
 cd ~/devops/zenpharma/backend
-git add */Dockerfile
 git add .github/workflows/
-git commit -m "feat: add Dockerfiles, CI/CD pipelines, and promotion workflow for all backend services"
+git commit -m "ci: add all CI/CD pipelines and promotion workflow for backend services"
 git push
 ```
 
-> **Tag `backend` repo: `module-7.5-backend-ci`**
+> **Tag `backend` repo: `module-7.5-backend-workflows`**
 >
 > ```bash
-> git tag -a module-7.5-backend-ci -m "Module 7.5: Dockerfiles, reusable workflows, per-service CI/CD, and PROD promotion for all 8 backend services"
-> git push origin module-7.5-backend-ci
+> git tag -a module-7.5-backend-workflows -m "Module 7.5: Reusable workflows, per-service CI/CD, PR checks, and PROD promotion"
+> git push origin module-7.5-backend-workflows
 > ```
 
 ---
@@ -1582,7 +1600,8 @@ aws ecr describe-images --repository-name api-gateway --region us-east-1 --query
 
 | Tag | Repos |
 |-----|-------|
-| `module-7.5-backend-ci` | backend |
+| `module-7.2-dockerfiles` | backend |
+| `module-7.5-backend-workflows` | backend |
 | `module-7.6-backend-values` | gitops |
 
 > **Next:** [Module 8 — Environment Promotion](MODULE-8-ENVIRONMENT-PROMOTION.md)

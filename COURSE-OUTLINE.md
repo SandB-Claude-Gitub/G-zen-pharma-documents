@@ -664,7 +664,8 @@ git push origin <tag-name>
 | 5.7 | `module-5.7-argocd-config` | gitops |
 | 5.8 | `module-5.8-pharma-ui-argocd-app` | gitops |
 | 6.6 | `module-6.6-first-deployment-verified` | all repos |
-| 7.5 | `module-7.5-backend-ci` | backend |
+| 7.2 | `module-7.2-dockerfiles` | backend |
+| 7.5 | `module-7.5-backend-workflows` | backend |
 | 7.6 | `module-7.6-backend-values` | gitops |
 | 7.8 | `module-7.8-full-stack-dev` | all repos |
 | 8.2 | `module-8.2-qa-environment` | gitops |
