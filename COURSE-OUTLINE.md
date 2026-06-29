@@ -509,28 +509,24 @@ gh --version
   - npm ci + ESLint → Jest + coverage (>= 80%) → SonarCloud → npm audit → Docker build → Trivy scan → ECR push → Cosign keyless signing
 - **Explain:** reusable workflows (`workflow_call`), why one reusable workflow per language, Cosign keyless image signing (supply chain security)
 
-> **Tag `backend` repo: `module-7.3-reusable-workflows`**
-
 ### 7.4 Create Per-Service CI Workflows
 - **Per-service CI workflows** (e.g., `ci-api-gateway.yml`):
   - Triggered on push to `develop`/`release/*` with path filter to that service's directory
   - Calls the reusable Java or Node.js workflow
-  - Then calls the reusable gitops update workflow
-  - Then opens a QA promotion PR
+  - Then updates gitops dev values with new image tag
 - **Per-service PR check workflows** (e.g., `ci-pr-api-gateway.yml`):
   - Triggered on PR to `main`/`develop`
   - Runs lint + test + security only (no Docker build, no ECR push)
 - **Explain:** path filtering (only build what changed), monorepo CI strategy, PR checks vs. merge CI
-
-> **Tag `backend` repo: `module-7.4-ci-workflows`**
 
 ### 7.5 Create Backend Promotion Workflow
 - **`promote-prod.yml`** — manual dispatch with service selector dropdown
   - Reads QA image tag → opens PROD PR in gitops repo
   - Single workflow handles all backend services via input parameter
 - **Explain:** consolidated promotion workflow vs. per-service (compare with frontend approach)
+- **Commit all workflows** (reusable, per-service, PR checks, promotion) as a single commit
 
-> **Tag `backend` repo: `module-7.5-promote-workflow`**
+> **Tag `backend` repo: `module-7.5-backend-workflows`**
 
 ### 7.6 Add Backend Values Files to GitOps Repo
 - Create `envs/dev/values-<service>.yaml` for each backend service
@@ -539,19 +535,29 @@ gh --version
 
 > **Tag `gitops` repo: `module-7.6-backend-values`**
 
-### 7.7 Build and Deploy Backend Services
-- Push backend code to `develop` branch (or trigger pipelines)
+### 7.7 Add Secrets, Variables, and SonarCloud to Backend Repo
+- **Add backend project to SonarCloud:**
+  - Analyze new project → select `backend` repo → Set Up
+  - Disable Automatic Analysis (Administration → Analysis Method → toggle OFF)
+  - Find project key via **Project Information** in SonarCloud sidebar
+- **Add repository secrets:** `AWS_ACCOUNT_ID`, `GITOPS_TOKEN`, `SONAR_TOKEN` (reuse from Module 4)
+- **Add repository variables:** `GITOPS_REPO`, `SONAR_ORG`, `SONAR_PROJECT_KEY_BACKEND`
+- Protect `main` branch (require PR, 0 approvals)
+- Create `develop` branch
+
+### 7.8 Build and Deploy All Backend Services
+- Push backend code to `develop` branch (or run `04_run_pipeline.py`)
 - All 8 services build, push images to ECR, update gitops dev values
 - Run `05_deploy_services.py` to register all ArgoCD Applications
 - Verify all services in ArgoCD UI — all should be "Synced" and "Healthy"
 
-### 7.8 End-to-End Validation
+### 7.9 End-to-End Validation
 - Access pharma-ui from browser via ALB URL
 - Verify frontend can talk to backend services through the API gateway
 - Check logs: `kubectl logs -n dev deployment/<service-name>`
 - **Explain:** debugging microservice issues, ArgoCD app-of-apps pattern
 
-> **Tag all repos: `module-7.8-full-stack-dev`**
+> **Tag all repos: `module-7.9-full-stack-dev`**
 
 ---
 
@@ -667,7 +673,7 @@ git push origin <tag-name>
 | 7.2 | `module-7.2-dockerfiles` | backend |
 | 7.5 | `module-7.5-backend-workflows` | backend |
 | 7.6 | `module-7.6-backend-values` | gitops |
-| 7.8 | `module-7.8-full-stack-dev` | all repos |
+| 7.9 | `module-7.9-full-stack-dev` | all repos |
 | 8.2 | `module-8.2-qa-environment` | gitops |
 | 8.3 | `module-8.3-prod-environment` | gitops |
 | 8.7 | `module-8.7-multi-env-infra` | infra (if applicable) |

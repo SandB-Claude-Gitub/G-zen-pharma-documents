@@ -1324,11 +1324,37 @@ git push
 
 ---
 
-## 7.7 Add Secrets and Variables to Backend Repo
+## 7.7 Add Secrets, Variables, and SonarCloud to Backend Repo
 
-The backend CI/CD workflows need the same secrets and variables as the frontend (Module 4).
+The backend CI/CD workflows need the same secrets and variables as the frontend (Module 4). We also need to add the backend repo as a new project in SonarCloud.
 
-### Step 1: Add Repository Secrets
+### Step 1: Add Backend Project to SonarCloud
+
+In Module 4 you added the **frontend** repo to SonarCloud. Now add the **backend** repo:
+
+1. Go to https://sonarcloud.io and log in with your GitHub account
+2. Click **Analyze new project** → select your `backend` repository → click **Set Up**
+3. SonarCloud creates the project
+
+**Disable Automatic Analysis (important):**
+
+1. Go to your **backend project page** on SonarCloud
+2. Click **Administration** (bottom of the left sidebar)
+3. Click **Analysis Method**
+4. Find the **Automatic Analysis** toggle and turn it **OFF**
+
+> **Why?** Just like the frontend, you cannot run both CI-based analysis and Automatic Analysis at the same time. The pipeline will fail with: `You are running CI analysis while Automatic Analysis is enabled`.
+
+**Find the Project Key:**
+
+1. Go to your backend project page on SonarCloud
+2. Click **Project Information** (bottom of the left sidebar)
+3. Copy the **Project Key** (e.g., `zenpharma_backend`)
+4. The **Organization Key** is the same one you used for frontend (e.g., `zenpharma`)
+
+> **Note:** You can reuse the same `SONAR_TOKEN` from Module 4 — it is a user-level token, not project-specific. One token works for all projects in your organization.
+
+### Step 2: Add Repository Secrets
 
 Go to your **backend** repository on GitHub:
 
@@ -1338,10 +1364,10 @@ Go to your **backend** repository on GitHub:
 | Secret | Value | Purpose |
 |--------|-------|---------|
 | `AWS_ACCOUNT_ID` | Your 12-digit AWS account ID | Used by OIDC role assumption for ECR access |
-| `GITOPS_TOKEN` | The fine-grained PAT created in Module 4 | Push commits and open PRs in zen-gitops |
-| `SONAR_TOKEN` | From SonarCloud > My Account > Security > Generate Tokens | Authenticates SonarCloud SAST and code-quality scans |
+| `GITOPS_TOKEN` | The fine-grained PAT created in Module 4 | Push commits and open PRs in gitops repo |
+| `SONAR_TOKEN` | Same token from Module 4 (or generate a new one) | Authenticates SonarCloud SAST and code-quality scans |
 
-### Step 2: Add Repository Variable
+### Step 3: Add Repository Variables
 
 In the same **Secrets and variables** > **Actions** page:
 
@@ -1349,13 +1375,13 @@ In the same **Secrets and variables** > **Actions** page:
 2. Click **New repository variable**
 3. Add:
 
-| Variable | Value |
-|----------|-------|
-| `GITOPS_REPO` | `<your-github-org>/zen-gitops` |
-| `SONAR_ORG` | Your SonarCloud organization key |
-| `SONAR_PROJECT_KEY_BACKEND` | Project key for backend in SonarCloud |
+| Variable | Value | How to Find |
+|----------|-------|-------------|
+| `GITOPS_REPO` | `<your-github-org>/gitops` | Your gitops repo in `owner/repo` format |
+| `SONAR_ORG` | Your SonarCloud organization key | Same as frontend — SonarCloud → **Project Information** |
+| `SONAR_PROJECT_KEY_BACKEND` | Project key for backend | SonarCloud → backend project → **Project Information** |
 
-### Step 3: Protect Main Branch
+### Step 4: Protect Main Branch
 
 1. Go to **Settings** > **Branches**
 2. Click **Add branch protection rule** (or **Add classic branch protection rule**)
@@ -1366,7 +1392,7 @@ In the same **Secrets and variables** > **Actions** page:
 5. **Do NOT enable** "Require status checks to pass before merging"
 6. Click **Create**
 
-### Step 4: Create Develop Branch
+### Step 5: Create Develop Branch
 
 ```bash
 cd ~/devops/zenpharma/backend
