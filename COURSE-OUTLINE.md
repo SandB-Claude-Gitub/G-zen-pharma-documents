@@ -433,55 +433,45 @@ gh --version
 
 ## Module 6 — First Deployment (Pharma-UI on Dev)
 
-### 6.1 Bootstrap ArgoCD
-- Run `02_bootstrap_argocd.py`
-- This configures ArgoCD with:
-  - Access to the gitops repo (using deploy key or token)
-  - ArgoCD project registration
-- Access ArgoCD UI:
-  - Get initial admin password: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d`
-  - Port forward: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
-  - Or access via ALB ingress (if configured)
+> ArgoCD bootstrap and External Secrets setup were completed in Module 3 (sections 3.4 and 3.5). Module 6 starts with those already in place.
 
-> **Tag `infra` repo: `module-6.1-argocd-bootstrap`**
+### 6.1 Pre-Deployment Checklist
+- Verify EKS cluster is running (`kubectl get nodes`)
+- Verify cluster prerequisites: ALB Controller, ArgoCD, ESO pods all Running
+- Verify External Secrets are synced: `kubectl get externalsecret -n dev` shows `SecretSynced`
+- Verify gitops repo has all required files (Helm chart, values, ArgoCD app manifest)
+- Verify frontend repo has Dockerfile and CI workflow, GitHub secrets/variables configured
 
-### 6.2 Setup External Secrets
-- Run `03_setup_external_secrets.py`
-- This creates:
-  - `SecretStore` — points to AWS Secrets Manager using the ESO IRSA role
-  - `ExternalSecret` — maps specific secrets (DB credentials, JWT secret) to Kubernetes Secrets
-- Verify: `kubectl get secretstore`, `kubectl get externalsecret`
-- **Explain:** how ExternalSecret controller polls Secrets Manager and creates/updates K8s Secrets
+### 6.2 Initialize Database Schemas
+- Get RDS endpoint via `terraform output`, AWS CLI, or Console
+- Connect to RDS via temporary pod: `kubectl run pg-client --rm -it --image=postgres:17`
+- Run `db-init/01-schemas.sql` to create 8 per-service schemas
+- Or use `infra/scripts/init-database.sh` for automated approach
+- Verify with `\dn` — 8 custom schemas + `public`
+- **Explain:** schema-per-service isolation, why RDS is only reachable from inside the cluster
 
-> **Tag `infra` repo: `module-6.2-external-secrets`**
+### 6.3 Run Pharma-UI CI Pipeline
+- Push to `develop` branch in frontend repo to trigger CI
+- Or run `python3 infra/scripts/04_run_pipeline.py`
+- Pipeline: Lint → Test → SonarCloud → Build → Docker Build & Push → Deploy DEV
+- Verify: image appears in ECR with SHA tag, gitops repo has updated `image.tag`
 
-### 6.3 Initialize Database Schemas
-- Connect to RDS via kubectl port-forward or bastion
-- Run `db-init/01-schemas.sql` to create per-service schemas
-- Verify schemas are created
-- **Explain:** schema-per-service isolation
+### 6.4 Deploy Pharma-UI via ArgoCD
+- Verify `repoURL` placeholders are replaced with actual GitHub org in ArgoCD app manifests
+- Apply: `kubectl apply -f argocd/apps/dev/pharma-ui-app.yaml`
+- Or run `python3 infra/scripts/05_deploy_services.py`
+- Watch sync: `kubectl get application pharma-ui-dev -n argocd -w` until `Synced` and `Healthy`
 
-### 6.4 Run Pharma-UI CI Pipeline
-- Push code to `develop` branch in frontend repo
-- Or run `04_run_pipeline.py` to trigger the pipeline via GitHub API
-- Pipeline builds Docker image, pushes to ECR, updates gitops dev values
-- Verify: image appears in ECR, gitops repo has updated image tag
+### 6.5 Verify the Deployment
+- Check ArgoCD UI: application tile shows Synced + Healthy
+- Check Kubernetes: pods Running, Service exists, Ingress has ALB hostname
+- Check ALB: `curl` returns 200
+- Or run `python3 infra/scripts/06_verify_deployment.py`
 
-### 6.5 Deploy Pharma-UI via ArgoCD
-- Run `05_deploy_services.py` to create the ArgoCD Application for pharma-ui
-- Or apply manually: `kubectl apply -f argocd/apps/dev/pharma-ui-app.yaml`
-- ArgoCD detects the values file and syncs the deployment
-
-> **Tag `gitops` repo: `module-6.5-pharma-ui-deployed`**
-
-### 6.6 Verify Deployment
-- Run `06_verify_deployment.py` for automated health checks
-- Check in ArgoCD UI: application should be "Synced" and "Healthy"
-- Get ALB URL: `kubectl get ingress -n dev`
-- Access pharma-ui from browser via the ALB URL
-- **Explain:** ArgoCD sync status, health checks, how ALB ingress works end-to-end
-
-> **Tag all repos: `module-6.6-first-deployment-verified`**
+### 6.6 Access Pharma-UI from the Browser
+- Open ALB URL in browser: `kubectl get ingress pharma-ui -n dev`
+- ZenPharma dashboard loads (backend APIs will fail — deployed in Module 7)
+- **Explain:** full pipeline flow: Code → CI → ECR → GitOps → ArgoCD → Pod → ALB → Browser
 
 ---
 
@@ -672,9 +662,6 @@ git push origin <tag-name>
 | 5.6 | `module-5.6-pharma-ui-values` | gitops |
 | 5.7 | `module-5.7-argocd-config` | gitops |
 | 5.8 | `module-5.8-pharma-ui-argocd-app` | gitops |
-| 6.1 | `module-6.1-argocd-bootstrap` | infra |
-| 6.2 | `module-6.2-external-secrets` | infra |
-| 6.5 | `module-6.5-pharma-ui-deployed` | gitops |
 | 6.6 | `module-6.6-first-deployment-verified` | all repos |
 | 7.2 | `module-7.2-dockerfiles` | backend |
 | 7.3 | `module-7.3-reusable-workflows` | backend |
