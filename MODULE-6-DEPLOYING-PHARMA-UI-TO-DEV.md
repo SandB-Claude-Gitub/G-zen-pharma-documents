@@ -9,6 +9,40 @@
 
 In Modules 1-5, you built every piece of the pipeline independently: infrastructure, CI workflows, Helm charts, ArgoCD configuration, and External Secrets. Before we deploy for the first time, we need to verify that **all** of those pieces are in place and healthy.
 
+### Step 0: Recreate Infrastructure and Re-Bootstrap the Cluster
+
+If you destroyed infrastructure at the end of Module 3, you need to bring everything back. Terraform recreates the AWS resources, but everything **inside** the cluster (Helm charts, ArgoCD config, External Secrets) must be reinstalled — those are not managed by Terraform.
+
+**Recreate infrastructure:**
+
+```bash
+cd ~/devops/zenpharma/infra/envs/dev
+terraform apply
+```
+
+Or use GitHub Actions (`workflow_dispatch` → action: `apply`).
+
+**Update kubectl context:**
+
+```bash
+aws eks update-kubeconfig --name pharma-dev-cluster --region us-east-1
+```
+
+**Re-run all three bootstrap scripts from Module 3:**
+
+```bash
+cd ~/devops/zenpharma
+python3 infra/scripts/01_install_prerequisites.py   # ALB Controller, ArgoCD, ESO
+python3 infra/scripts/02_bootstrap_argocd.py         # Register gitops repo, AppProject
+python3 infra/scripts/03_setup_external_secrets.py   # ClusterSecretStore, ExternalSecrets
+```
+
+> **Why?** Terraform only manages AWS resources (VPC, EKS, RDS, IAM). The Helm charts (ALB Controller, ArgoCD, ESO), Kubernetes Secrets, ClusterSecretStore, and ExternalSecrets all live **inside** the cluster. When the cluster is destroyed and recreated, these are gone. The bootstrap scripts reinstall them.
+
+If you did **not** destroy infrastructure between modules, skip Step 0 and proceed to the checks below.
+
+---
+
 Work through each check below. If any check fails, go back to the relevant module and fix it before proceeding.
 
 ### Check 1: EKS Cluster Is Running

@@ -436,6 +436,7 @@ gh --version
 > ArgoCD bootstrap and External Secrets setup were completed in Module 3 (sections 3.4 and 3.5). Module 6 starts with those already in place.
 
 ### 6.1 Pre-Deployment Checklist
+- **If cluster was destroyed:** Recreate with `terraform apply`, then re-run all 3 bootstrap scripts from Module 3 (`01_install_prerequisites.py`, `02_bootstrap_argocd.py`, `03_setup_external_secrets.py`)
 - Verify EKS cluster is running (`kubectl get nodes`)
 - Verify cluster prerequisites: ALB Controller, ArgoCD, ESO pods all Running
 - Verify External Secrets are synced: `kubectl get externalsecret -n dev` shows `SecretSynced`
@@ -663,10 +664,7 @@ git push origin <tag-name>
 | 5.7 | `module-5.7-argocd-config` | gitops |
 | 5.8 | `module-5.8-pharma-ui-argocd-app` | gitops |
 | 6.6 | `module-6.6-first-deployment-verified` | all repos |
-| 7.2 | `module-7.2-dockerfiles` | backend |
-| 7.3 | `module-7.3-reusable-workflows` | backend |
-| 7.4 | `module-7.4-ci-workflows` | backend |
-| 7.5 | `module-7.5-promote-workflow` | backend |
+| 7.5 | `module-7.5-backend-ci` | backend |
 | 7.6 | `module-7.6-backend-values` | gitops |
 | 7.8 | `module-7.8-full-stack-dev` | all repos |
 | 8.2 | `module-8.2-qa-environment` | gitops |

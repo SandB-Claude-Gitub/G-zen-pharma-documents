@@ -196,21 +196,7 @@ EOF
 echo "Created notification-service/Dockerfile"
 ```
 
-### Step 3: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/backend
-git add */Dockerfile
-git commit -m "feat: add Dockerfiles for all 8 microservices"
-git push
-```
-
-> **Tag `backend` repo: `module-7.2-dockerfiles`**
->
-> ```bash
-> git tag -a module-7.2-dockerfiles -m "Module 7.2: Dockerfiles for all 8 backend microservices"
-> git push origin module-7.2-dockerfiles
-> ```
+> **Don't commit yet** — we will commit all Dockerfiles and workflows together as a single commit in section 7.5.
 
 ---
 
@@ -534,24 +520,7 @@ on:
         default: '22'
 ```
 
-### Step 5: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/backend
-git add .github/workflows/_java-build.yml \
-        .github/workflows/_node-build.yml \
-        .github/workflows/_java-pr-check.yml \
-        .github/workflows/_node-pr-check.yml
-git commit -m "ci: add reusable build and PR check workflows for Java and Node.js"
-git push
-```
-
-> **Tag `backend` repo: `module-7.3-reusable-workflows`**
->
-> ```bash
-> git tag -a module-7.3-reusable-workflows -m "Module 7.3: Reusable CI/CD workflows for Java and Node.js services"
-> git push origin module-7.3-reusable-workflows
-> ```
+> **Don't commit yet** — we will commit all workflows together with the Dockerfiles in section 7.5.
 
 ---
 
@@ -839,21 +808,7 @@ The pattern is identical across all Java services — only `service-name`, `serv
 > **Why not use a matrix strategy?**
 > GitHub Actions supports matrix builds (e.g., `strategy: matrix: service: [api-gateway, auth-service, ...]`). However, monorepo path filtering does not work with matrices — the matrix would trigger all 8 services on every push. Per-service workflow files with `paths` filters give us precise triggering: change one service, build only that service.
 
-### Step 5: Commit and Push
-
-```bash
-cd ~/devops/zenpharma/backend
-git add .github/workflows/ci-*.yml
-git commit -m "ci: add per-service CI/CD and PR check workflows for all 8 microservices"
-git push
-```
-
-> **Tag `backend` repo: `module-7.4-ci-workflows`**
->
-> ```bash
-> git tag -a module-7.4-ci-workflows -m "Module 7.4: Per-service CI/CD and PR check workflows for all 8 microservices"
-> git push origin module-7.4-ci-workflows
-> ```
+> **Don't commit yet** — we will commit all per-service workflows together with the Dockerfiles and reusable workflows in section 7.5.
 
 ---
 
@@ -1025,20 +980,23 @@ jobs:
 
 > **Note:** QA promotion for backend services uses the same manual workflow pattern. Create a `promote-qa.yml` workflow (similar to `promote-prod.yml`) with a service dropdown. The workflow reads the image tag from `envs/dev/values-<service>.yaml` and opens a PR to update `envs/qa/values-<service>.yaml`.
 
-### Step 2: Commit and Push
+### Step 2: Commit All Dockerfiles and Workflows
+
+Now commit everything from sections 7.2–7.5 as a single commit — all Dockerfiles, reusable workflows, per-service workflows, and the promotion workflow:
 
 ```bash
 cd ~/devops/zenpharma/backend
-git add .github/workflows/promote-prod.yml
-git commit -m "ci: add consolidated PROD promotion workflow for all backend services"
+git add */Dockerfile
+git add .github/workflows/
+git commit -m "feat: add Dockerfiles, CI/CD pipelines, and promotion workflow for all backend services"
 git push
 ```
 
-> **Tag `backend` repo: `module-7.5-promote-workflow`**
+> **Tag `backend` repo: `module-7.5-backend-ci`**
 >
 > ```bash
-> git tag -a module-7.5-promote-workflow -m "Module 7.5: Consolidated PROD promotion workflow"
-> git push origin module-7.5-promote-workflow
+> git tag -a module-7.5-backend-ci -m "Module 7.5: Dockerfiles, reusable workflows, per-service CI/CD, and PROD promotion for all 8 backend services"
+> git push origin module-7.5-backend-ci
 > ```
 
 ---
@@ -1624,10 +1582,7 @@ aws ecr describe-images --repository-name api-gateway --region us-east-1 --query
 
 | Tag | Repos |
 |-----|-------|
-| `module-7.2-dockerfiles` | backend |
-| `module-7.3-reusable-workflows` | backend |
-| `module-7.4-ci-workflows` | backend |
-| `module-7.5-promote-workflow` | backend |
+| `module-7.5-backend-ci` | backend |
 | `module-7.6-backend-values` | gitops |
 
 > **Next:** [Module 8 — Environment Promotion](MODULE-8-ENVIRONMENT-PROMOTION.md)
