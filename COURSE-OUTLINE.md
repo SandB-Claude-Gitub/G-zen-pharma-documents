@@ -519,12 +519,15 @@ gh --version
   - Runs lint + test + security only (no Docker build, no ECR push)
 - **Explain:** path filtering (only build what changed), monorepo CI strategy, PR checks vs. merge CI
 
-### 7.5 Create Backend Promotion Workflow
+### 7.5 Create Backend Promotion Workflows
+- **`promote-qa.yml`** — manual dispatch with service selector dropdown
+  - Reads DEV image tag → opens QA PR in gitops repo
+  - Same pattern as frontend: independent, manually triggered
 - **`promote-prod.yml`** — manual dispatch with service selector dropdown
-  - Reads QA image tag → opens PROD PR in gitops repo
-  - Single workflow handles all backend services via input parameter
+  - Reads QA image tag → opens PROD PR in gitops repo with approval checklist
+  - PROD ArgoCD requires manual sync after merge
 - **Explain:** consolidated promotion workflow vs. per-service (compare with frontend approach)
-- **Commit all workflows** (reusable, per-service, PR checks, promotion) as a single commit
+- **Commit all workflows** (reusable, per-service, PR checks, QA + PROD promotion) as a single commit
 
 > **Tag `backend` repo: `module-7.5-backend-workflows`**
 

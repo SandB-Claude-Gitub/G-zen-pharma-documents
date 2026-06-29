@@ -831,11 +831,137 @@ The pattern is identical across all Java services — only `service-name`, `serv
 
 ---
 
-## 7.5 Create Backend Promotion Workflow
+## 7.5 Create Backend Promotion Workflows
 
-In Module 4 (frontend), we created a separate promotion workflow for pharma-ui. For the backend, we use a **single consolidated promotion workflow** that handles all services via a dropdown input.
+In Module 4 (frontend), we created separate QA and PROD promotion workflows for pharma-ui. For the backend, we use the same pattern — **consolidated promotion workflows** with a service dropdown so one workflow handles all services.
 
-### Step 1: Create `promote-prod.yml`
+### Step 1: Create `promote-qa.yml`
+
+Create `.github/workflows/promote-qa.yml`:
+
+```yaml
+name: Promote to QA
+
+# Triggered manually — picks up the image currently running in DEV and opens
+# a PR in the GitOps repo to promote it to QA.
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to promote (use the gitops values file name)'
+        required: true
+        type: choice
+        options:
+          - api-gateway
+          - auth-service
+          - catalog-service
+          - inventory-service
+          - manufacturing-service
+          - notification-service
+          - supplier-service
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  GITOPS_REPO: ${{ vars.GITOPS_REPO }}
+
+jobs:
+
+  promote:
+    name: Open QA Promotion PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: _gitops
+
+      - name: Install yq
+        run: |
+          wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+
+      - name: Read image tag from DEV
+        env:
+          SVC: ${{ inputs.service }}
+        run: |
+          DEV_VALUES="_gitops/envs/dev/values-${SVC}.yaml"
+          if [[ ! -f "$DEV_VALUES" ]]; then
+            echo "::error::DEV values file not found: ${DEV_VALUES}"
+            exit 1
+          fi
+          IMAGE_TAG=$(yq e '.image.tag' "$DEV_VALUES")
+          if [[ -z "$IMAGE_TAG" || "$IMAGE_TAG" == "null" ]]; then
+            echo "::error::Could not read .image.tag from $DEV_VALUES"
+            exit 1
+          fi
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "$GITHUB_ENV"
+          echo "Promoting image: ${IMAGE_TAG}"
+
+      - name: Validate QA values file exists
+        env:
+          SVC: ${{ inputs.service }}
+        run: |
+          QA_VALUES="_gitops/envs/qa/values-${SVC}.yaml"
+          if [[ ! -f "$QA_VALUES" ]]; then
+            echo "::error::QA values file not found: ${QA_VALUES}"
+            echo "::error::Create envs/qa/values-${SVC}.yaml first (Module 8)."
+            exit 1
+          fi
+          echo "QA_VALUES=envs/qa/values-${SVC}.yaml" >> "$GITHUB_ENV"
+
+      - name: Create branch, patch values, open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+          SVC: ${{ inputs.service }}
+          ACTOR: ${{ github.actor }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          GITOPS_REPO_NAME: ${{ env.GITOPS_REPO }}
+        run: |
+          BRANCH="promote/qa/${SVC}/${IMAGE_TAG}"
+
+          cd _gitops
+          git checkout -b "$BRANCH"
+          yq e ".image.tag = \"${IMAGE_TAG}\"" -i "${QA_VALUES}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --staged --quiet; then
+            echo "::notice::QA already has image ${IMAGE_TAG} — no PR needed."
+            exit 0
+          fi
+          git commit -m "promote(qa): ${SVC} → ${IMAGE_TAG}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --repo "$GITOPS_REPO_NAME" \
+            --title "promote(qa): ${SVC} → ${IMAGE_TAG}" \
+            --body "## QA Promotion
+
+          Service : ${SVC}
+          Image   : ${IMAGE_TAG}
+          Promoted from DEV by : ${ACTOR}
+          Workflow run : ${SERVER_URL}/${REPOSITORY}/actions/runs/${RUN_ID}
+
+          Merging this PR updates ${QA_VALUES}. ArgoCD will auto-sync QA." \
+            --base main \
+            --head "$BRANCH"
+
+          echo "::notice title=QA PR opened::Review and merge in ${GITOPS_REPO_NAME}."
+```
+
+### Step 2: Create `promote-prod.yml`
 
 Create `.github/workflows/promote-prod.yml`:
 
@@ -997,9 +1123,7 @@ jobs:
 > **Why one consolidated workflow instead of 8 separate ones?**
 > The promotion logic is identical for all services — read QA tag, update PROD, open PR. Having 8 separate workflows would mean duplicating this logic 8 times. The `choice` input with a dropdown keeps it simple: one workflow, pick the service, promote. For the frontend, we used a separate workflow because the frontend repo only has one service.
 
-> **Note:** QA promotion for backend services uses the same manual workflow pattern. Create a `promote-qa.yml` workflow (similar to `promote-prod.yml`) with a service dropdown. The workflow reads the image tag from `envs/dev/values-<service>.yaml` and opens a PR to update `envs/qa/values-<service>.yaml`.
-
-### Step 2: Commit All Workflows
+### Step 3: Commit All Workflows
 
 Now commit all workflow files from sections 7.3–7.5 as a single commit — reusable workflows, per-service CI/CD and PR check workflows, and the promotion workflow:
 
