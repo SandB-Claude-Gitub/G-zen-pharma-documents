@@ -667,9 +667,9 @@ git push origin <tag-name>
 | 4.4 | `module-4.4-ci-workflows` | frontend |
 | 5.1 | `module-5.1-repo-structure` | gitops |
 | 5.4 | `module-5.4-raw-manifests` | gitops |
-| 5.5 | `module-5.6-helm-chart` | gitops |
-| 5.6 | `module-5.7-pharma-ui-values` | gitops |
-| 5.7 | `module-5.2-argocd-config` | gitops |
+| 5.5 | `module-5.5-helm-chart` | gitops |
+| 5.6 | `module-5.6-pharma-ui-values` | gitops |
+| 5.7 | `module-5.7-argocd-config` | gitops |
 | 5.8 | `module-5.8-pharma-ui-argocd-app` | gitops |
 | 6.1 | `module-6.1-argocd-bootstrap` | infra |
 | 6.2 | `module-6.2-external-secrets` | infra |

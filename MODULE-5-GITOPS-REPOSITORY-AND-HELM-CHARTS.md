@@ -1094,11 +1094,11 @@ git commit -m "feat: add shared Helm chart for all microservices"
 git push origin main
 ```
 
-> **Tag `gitops` repo: `module-5.6-helm-chart`**
+> **Tag `gitops` repo: `module-5.5-helm-chart`**
 > ```bash
 > cd ~/devops/zenpharma/gitops
-> git tag -a module-5.6-helm-chart -m "Module 5.6: Shared Helm chart with all templates"
-> git push origin module-5.6-helm-chart
+> git tag -a module-5.5-helm-chart -m "Module 5.5: Shared Helm chart with all templates"
+> git push origin module-5.5-helm-chart
 > ```
 
 ---
@@ -1340,11 +1340,11 @@ git commit -m "feat: add pharma-ui values file for dev environment"
 git push origin main
 ```
 
-> **Tag `gitops` repo: `module-5.7-pharma-ui-values`**
+> **Tag `gitops` repo: `module-5.6-pharma-ui-values`**
 > ```bash
 > cd ~/devops/zenpharma/gitops
-> git tag -a module-5.7-pharma-ui-values -m "Module 5.7: Pharma-UI values file for dev"
-> git push origin module-5.7-pharma-ui-values
+> git tag -a module-5.6-pharma-ui-values -m "Module 5.6: Pharma-UI values file for dev"
+> git push origin module-5.6-pharma-ui-values
 > ```
 
 ---
@@ -1482,11 +1482,11 @@ git commit -m "feat: add ArgoCD project and ingress configuration"
 git push origin main
 ```
 
-> **Tag `gitops` repo: `module-5.2-argocd-config`**
+> **Tag `gitops` repo: `module-5.7-argocd-config`**
 > ```bash
 > cd ~/devops/zenpharma/gitops
-> git tag -a module-5.2-argocd-config -m "Module 5.2: ArgoCD project and ingress configuration"
-> git push origin module-5.2-argocd-config
+> git tag -a module-5.7-argocd-config -m "Module 5.7: ArgoCD project and ingress configuration"
+> git push origin module-5.7-argocd-config
 > ```
 
 ---
@@ -1662,7 +1662,7 @@ git push origin main
 |--------------|---------|
 | **GitOps repo structure** | Organized directories for Helm charts, environment configs, ArgoCD apps, and K8s manifests |
 | **Kubernetes namespaces** | `dev` namespace for environment isolation |
-| **Database schemas** | 8 PostgreSQL schemas (one per microservice) using schema-per-service pattern |
+| **Database init script** | SQL file for 8 PostgreSQL schemas (one per microservice) — executed in Module 6, not here |
 | **Raw Kubernetes manifests** | Hands-on deployment of pharma-ui with raw YAML (Deployment, Service, Ingress, ConfigMap) to understand manifest structure before Helm |
 | **Shared Helm chart** | 7 templates (Deployment, Service, Ingress, ConfigMap, HPA, ServiceAccount, helpers) with security-hardened defaults |
 | **Pharma-UI values (dev)** | Environment-specific overrides for the React frontend — Nginx port 80, lightweight resources, emptyDir volumes |
@@ -1674,9 +1674,9 @@ git push origin main
 |-----|------|
 | `module-5.1-repo-structure` | gitops |
 | `module-5.4-raw-manifests` | gitops |
-| `module-5.6-helm-chart` | gitops |
-| `module-5.7-pharma-ui-values` | gitops |
-| `module-5.2-argocd-config` | gitops |
+| `module-5.5-helm-chart` | gitops |
+| `module-5.6-pharma-ui-values` | gitops |
+| `module-5.7-argocd-config` | gitops |
 | `module-5.8-pharma-ui-argocd-app` | gitops |
 
 > **Next:** [Module 6 — Deploying Pharma-UI to Dev](MODULE-6-DEPLOYING-PHARMA-UI-TO-DEV.md)
