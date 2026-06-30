@@ -592,22 +592,24 @@ gh --version
   ArgoCD PROD: manual sync required → deploy
   ```
 
-### 8.2 Add QA Environment Values and ArgoCD Apps
-- Create `envs/qa/values-<service>.yaml` for all services
-- Create `argocd/apps/qa/<service>-app.yaml` for all services
-- **Explain:** environment-specific configuration differences (replicas, resources, feature flags)
+> **Demonstration scope:** Module 8 demonstrates environment promotion using **pharma-ui only**. The same pattern applies identically to all 8 backend services — promoting them is left as an optional self-guided exercise (see end of 8.5).
+
+### 8.2 Add QA Environment Values and ArgoCD App (Pharma-UI)
+- Create `envs/qa/values-pharma-ui.yaml`
+- Create `argocd/apps/qa/pharma-ui-app.yaml`
+- **Explain:** environment-specific configuration differences (ALB group, host, ENV), placeholder image tag
 
 > **Tag `gitops` repo: `module-8.2-qa-environment`**
 
-### 8.3 Add Prod Environment Values and ArgoCD Apps
-- Create `envs/prod/values-<service>.yaml` for all services
-- Create `argocd/apps/prod/<service>-app.yaml` for all services
-- **Explain:** prod differences — higher replicas, stricter resource limits, manual sync policy, HPA enabled
+### 8.3 Add Prod Environment Values and ArgoCD App (Pharma-UI)
+- Create `envs/prod/values-pharma-ui.yaml`
+- Create `argocd/apps/prod/pharma-ui-app.yaml`
+- **Explain:** prod differences — what a real prod setup would add (higher replicas, HPA, manual sync, stricter limits)
 
 > **Tag `gitops` repo: `module-8.3-prod-environment`**
 
 ### 8.4 Promote Pharma-UI from Dev → QA
-- CI has already opened a QA PR (from Module 6.4 pipeline run)
+- Trigger `promote-qa-pharma-ui.yml` via workflow_dispatch in frontend repo
 - Review the PR in gitops repo — verify only the image tag changed
 - Merge the PR
 - ArgoCD detects the change and syncs QA
@@ -619,22 +621,21 @@ gh --version
 - Merge the PR
 - Manually sync in ArgoCD (PROD requires manual sync for safety)
 - Verify in ArgoCD UI and browser
+- **Optional exercise:** repeat the same flow for backend services using `promote-qa.yml` / `promote-prod.yml` with the service dropdown (Module 7.5)
 
-### 8.6 Promote Backend Services
-- Repeat the promotion flow for backend services
-- Use the consolidated `promote-prod.yml` workflow with the service selector dropdown
-- **Explain:** staggered rollouts, rollback via reverting the gitops PR
+### 8.6 Rollback Strategy
+- Identify the bad deployment via `git log` on the gitops repo
+- Revert the merge commit: `git revert <sha> -m 1`
+- Push the revert — ArgoCD auto-syncs back to the previous image
+- Verify rollback with `kubectl get deployment pharma-ui -n prod -o jsonpath=...`
+- **Explain:** why `git revert` beats `kubectl rollout undo` — full audit trail, no cluster access needed, works for any config change
 
-### 8.7 QA/Prod Terraform Infrastructure (If Multi-Cluster)
-- If using separate EKS clusters for QA and Prod:
-  - Populate `envs/qa/main.tf` and `envs/prod/main.tf` with appropriate values
-  - Run Terraform apply for each environment
-  - Configure kubectl contexts for each cluster
-- If using single cluster with namespace isolation:
-  - **Explain:** the trade-offs (cost vs. isolation)
+### 8.7 Course Wrap-Up
+- Verify pharma-ui pods running in dev, qa, and prod namespaces
+- Recap what was built across all 8 modules
+- Recap key practices: IaC, CI/CD, GitOps, secrets management, environment promotion, security
+- **Explain:** what's not covered (monitoring, log aggregation, DNS/TLS) as next steps to explore
 
-> **Tag `infra` repo: `module-8.7-multi-env-infra`** (if applicable)
->
 > **Tag all repos: `module-8-promotion-complete`**
 
 ---
@@ -679,7 +680,6 @@ git push origin <tag-name>
 | 7.9 | `module-7.9-full-stack-dev` | all repos |
 | 8.2 | `module-8.2-qa-environment` | gitops |
 | 8.3 | `module-8.3-prod-environment` | gitops |
-| 8.7 | `module-8.7-multi-env-infra` | infra (if applicable) |
 | 8 (end) | `module-8-promotion-complete` | all repos |
 
 ---

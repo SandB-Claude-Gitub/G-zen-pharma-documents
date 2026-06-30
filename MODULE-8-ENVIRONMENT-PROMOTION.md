@@ -65,11 +65,9 @@ Why three gates? Because accidental production deployments are the most expensiv
 
 ## 8.2 Add QA Environment Configuration
 
-All our services are running in DEV. Now we create the QA environment configuration — values files and ArgoCD Application manifests.
+Pharma-ui is running in DEV. Now we create the QA environment configuration — values file and ArgoCD Application manifest. We demonstrate environment promotion with **pharma-ui only**; the same pattern applies identically to every backend service if you want to extend this on your own later.
 
-### Step 1: Create QA Values Files
-
-The QA values files are nearly identical to DEV, with a few key differences. Let's create them starting with pharma-ui.
+### Step 1: Create the QA Values File
 
 ```bash
 cd ~/devops/zenpharma/gitops
@@ -171,37 +169,13 @@ EOF
 > - `configmap.ENV`: `qa` instead of `dev` — the application knows which environment it's in
 > - `image.tag`: starts as `v1.0.0` (a placeholder) — the CI pipeline will update this when promoting from DEV
 
-Now create values files for all backend services. Each follows the same pattern — copy from dev and change the ALB group, host, and environment-specific config values.
+> **Why a placeholder tag like `v1.0.0`?** When ArgoCD first sees this file, we don't have a QA-promoted image yet. The placeholder prevents ArgoCD from trying to pull an image that doesn't exist. Once the first QA promotion PR is merged, CI will replace this tag with the actual image SHA.
 
-Create the remaining QA values files:
+> **Extending to backend services:** If you want to apply this pattern to the 8 backend services later, copy each `envs/dev/values-<service>.yaml` to `envs/qa/values-<service>.yaml` and update `group.name`, `host`, `SPRING_PROFILES_ACTIVE` (or `NODE_ENV` for notification-service), and `serviceAccount.annotations` the same way.
 
-```bash
-# Create QA values for all backend services
-# Each follows the same pattern: change group.name, host, and env-specific config
+### Step 2: Create the QA ArgoCD Application Manifest
 
-for service in api-gateway auth-service catalog-service inventory-service \
-               manufacturing-service notification-service supplier-service qc-service; do
-  cp envs/dev/values-${service}.yaml envs/qa/values-${service}.yaml
-done
-```
-
-After copying, update each file to reflect the QA environment. The key changes for every backend service are:
-
-| Setting | DEV value | QA value |
-|---------|-----------|----------|
-| `group.name` | `pharma-dev` | `pharma-qa` |
-| `host` | `""` | `qa.pharma.internal` |
-| `SPRING_PROFILES_ACTIVE` | `dev` | `qa` |
-| `serviceAccount.annotations` | `pharma-dev-eks-role` | `pharma-qa-eks-role` |
-| `image.tag` | `sha-xxxxxxx` (CI-set) | `v1.0.0` (placeholder) |
-
-For Node.js services (notification-service), change `NODE_ENV` from `development` to `qa` instead of `SPRING_PROFILES_ACTIVE`.
-
-> **Why a placeholder tag like `v1.0.0`?** When ArgoCD first sees these files, we don't have a QA-promoted image yet. The placeholder prevents ArgoCD from trying to pull an image that doesn't exist. Once the first QA promotion PR is merged, CI will replace this tag with the actual image SHA.
-
-### Step 2: Create QA ArgoCD Application Manifests
-
-Each service needs an ArgoCD Application manifest that tells ArgoCD:
+The ArgoCD Application manifest tells ArgoCD:
 - Which Helm chart to use
 - Which values file to overlay
 - Which namespace to deploy into
@@ -263,91 +237,32 @@ EOF
 > - `destination.namespace`: `qa` (not `dev`)
 > - Sync policy is still `automated` — same as dev. QA promotion is gated by the PR merge, not by ArgoCD sync policy.
 
-Create ArgoCD apps for all backend services:
+> **Extending to backend services:** Each backend service would get its own `argocd/apps/qa/<service>-app.yaml` following the same template — just change `metadata.name`, `app` label, and `helm.valueFiles` to point at that service's QA values file.
+
+### Step 3: Apply the QA ArgoCD App
 
 ```bash
-for service in api-gateway auth-service catalog-service inventory-service \
-               manufacturing-service notification-service supplier-service qc-service; do
-  cat > argocd/apps/qa/${service}-app.yaml << EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: ${service}-qa
-  namespace: argocd
-  labels:
-    env: qa
-    app: ${service}
-    managed-by: terraform
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: pharma
-
-  source:
-    repoURL: https://github.com/<YOUR_ORG>/zen-gitops.git
-    targetRevision: HEAD
-    path: helm-charts
-    helm:
-      valueFiles:
-        - ../envs/qa/values-${service}.yaml
-
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: qa
-
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-    syncOptions:
-      - CreateNamespace=true
-      - PrunePropagationPolicy=foreground
-      - PruneLast=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-
-  revisionHistoryLimit: 10
-EOF
-done
-```
-
-### Step 3: Apply the QA ArgoCD Apps
-
-```bash
-kubectl apply -f argocd/apps/qa/
+kubectl apply -f argocd/apps/qa/pharma-ui-app.yaml
 ```
 
 **Expected output:**
 ```
-application.argoproj.io/api-gateway-qa created
-application.argoproj.io/auth-service-qa created
-application.argoproj.io/catalog-service-qa created
-application.argoproj.io/inventory-service-qa created
-application.argoproj.io/manufacturing-service-qa created
-application.argoproj.io/notification-service-qa created
 application.argoproj.io/pharma-ui-qa created
-application.argoproj.io/qc-service-qa created
-application.argoproj.io/supplier-service-qa created
 ```
 
 ### Step 4: Commit and Push
 
 ```bash
 cd ~/devops/zenpharma/gitops
-git add envs/qa/ argocd/apps/qa/
-git commit -m "feat: add QA environment values and ArgoCD apps for all services"
+git add envs/qa/values-pharma-ui.yaml argocd/apps/qa/pharma-ui-app.yaml
+git commit -m "feat: add QA environment values and ArgoCD app for pharma-ui"
 git push origin main
 ```
 
 > **Tag `gitops` repo: `module-8.2-qa-environment`**
 > ```bash
 > cd ~/devops/zenpharma/gitops
-> git tag -a module-8.2-qa-environment -m "Module 8.2: QA environment configuration for all services"
+> git tag -a module-8.2-qa-environment -m "Module 8.2: QA environment configuration for pharma-ui"
 > git push origin module-8.2-qa-environment
 > ```
 
@@ -355,9 +270,9 @@ git push origin main
 
 ## 8.3 Add Prod Environment Configuration
 
-Production follows the same structure as QA but with production-appropriate settings.
+Production follows the same structure as QA but with production-appropriate settings. Again, we configure **pharma-ui only**.
 
-### Step 1: Create Prod Values Files
+### Step 1: Create the Prod Values File
 
 Create the pharma-ui PROD values file:
 
@@ -444,23 +359,7 @@ EOF
 > - `host`: `prod.pharma.internal` instead of `qa.pharma.internal`
 > - `configmap.ENV`: `prod` instead of `qa`
 
-Create PROD values for all backend services:
-
-```bash
-for service in api-gateway auth-service catalog-service inventory-service \
-               manufacturing-service notification-service supplier-service; do
-  cp envs/qa/values-${service}.yaml envs/prod/values-${service}.yaml
-done
-```
-
-After copying, update each file to reflect the PROD environment:
-
-| Setting | QA value | PROD value |
-|---------|----------|------------|
-| `group.name` | `pharma-qa` | `pharma-prod` |
-| `host` | `qa.pharma.internal` | `prod.pharma.internal` |
-| `SPRING_PROFILES_ACTIVE` | `qa` | `prod` |
-| `serviceAccount.annotations` | `pharma-qa-eks-role` | `pharma-prod-eks-role` |
+> **Extending to backend services:** Copy each `envs/qa/values-<service>.yaml` to `envs/prod/values-<service>.yaml` and update `group.name`, `host`, `SPRING_PROFILES_ACTIVE` (or `NODE_ENV`), and `serviceAccount.annotations` the same way.
 
 > **What would be different in a real production environment?**
 > In this course, we keep PROD nearly identical to QA for simplicity. In a real production setup, you would typically configure:
@@ -472,7 +371,7 @@ After copying, update each file to reflect the PROD environment:
 >
 > **Note:** The prod ArgoCD app in this course still has `automated` sync for simplicity. In a real production environment, you would remove automated sync and require manual sync as an additional safety gate.
 
-### Step 2: Create Prod ArgoCD Application Manifests
+### Step 2: Create the Prod ArgoCD Application Manifest
 
 Create the pharma-ui PROD ArgoCD app:
 
@@ -524,90 +423,32 @@ spec:
 EOF
 ```
 
-Create ArgoCD apps for all backend services:
+> **Extending to backend services:** Each backend service would get its own `argocd/apps/prod/<service>-app.yaml` following the same template.
+
+### Step 3: Apply the Prod ArgoCD App
 
 ```bash
-for service in api-gateway auth-service catalog-service inventory-service \
-               manufacturing-service notification-service supplier-service; do
-  cat > argocd/apps/prod/${service}-app.yaml << EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: ${service}-prod
-  namespace: argocd
-  labels:
-    env: prod
-    app: ${service}
-    managed-by: terraform
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
-spec:
-  project: pharma
-
-  source:
-    repoURL: https://github.com/<YOUR_ORG>/zen-gitops.git
-    targetRevision: HEAD
-    path: helm-charts
-    helm:
-      valueFiles:
-        - ../envs/prod/values-${service}.yaml
-
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: prod
-
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-    syncOptions:
-      - CreateNamespace=true
-      - PrunePropagationPolicy=foreground
-      - PruneLast=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-
-  revisionHistoryLimit: 10
-EOF
-done
-```
-
-### Step 3: Apply the Prod ArgoCD Apps
-
-```bash
-kubectl apply -f argocd/apps/prod/
+kubectl apply -f argocd/apps/prod/pharma-ui-app.yaml
 ```
 
 **Expected output:**
 ```
-application.argoproj.io/api-gateway-prod created
-application.argoproj.io/auth-service-prod created
-application.argoproj.io/catalog-service-prod created
-application.argoproj.io/inventory-service-prod created
-application.argoproj.io/manufacturing-service-prod created
-application.argoproj.io/notification-service-prod created
 application.argoproj.io/pharma-ui-prod created
-application.argoproj.io/supplier-service-prod created
 ```
 
 ### Step 4: Commit and Push
 
 ```bash
 cd ~/devops/zenpharma/gitops
-git add envs/prod/ argocd/apps/prod/
-git commit -m "feat: add PROD environment values and ArgoCD apps for all services"
+git add envs/prod/values-pharma-ui.yaml argocd/apps/prod/pharma-ui-app.yaml
+git commit -m "feat: add PROD environment values and ArgoCD app for pharma-ui"
 git push origin main
 ```
 
 > **Tag `gitops` repo: `module-8.3-prod-environment`**
 > ```bash
 > cd ~/devops/zenpharma/gitops
-> git tag -a module-8.3-prod-environment -m "Module 8.3: PROD environment configuration for all services"
+> git tag -a module-8.3-prod-environment -m "Module 8.3: PROD environment configuration for pharma-ui"
 > git push origin module-8.3-prod-environment
 > ```
 
@@ -834,126 +675,11 @@ pharma-ui   alb     prod.pharma.internal    k8s-pharmap-xxxxxxxx-xxxxxxxxxx.us-e
 
 Verify in ArgoCD UI that `pharma-ui-prod` shows **Synced** and **Healthy**.
 
----
-
-## 8.6 Promote Backend Services
-
-The backend services follow the same promotion flow as pharma-ui, but use a consolidated workflow with a service selector dropdown.
-
-### Step 1: Promote Backend from Dev to QA
-
-Just like pharma-ui, QA promotion for backend services is a manual trigger. Use the `promote-qa.yml` workflow (or trigger per-service QA promotion workflows) to open PRs for each service. Check your gitops repo for pending PRs:
-
-```bash
-gh pr list --repo <YOUR_ORG>/gitops
-```
-
-You should see PRs like:
-```
-#15  promote(qa): api-gateway → sha-32835e1       promote/qa/api-gateway/sha-32835e1       main
-#16  promote(qa): auth-service → sha-a1b2c3d       promote/qa/auth-service/sha-a1b2c3d      main
-#17  promote(qa): catalog-service → sha-d4e5f6g    promote/qa/catalog-service/sha-d4e5f6g   main
-...
-```
-
-Review and merge each PR:
-
-```bash
-# Merge all QA promotion PRs
-gh pr merge <PR_NUMBER> --repo <YOUR_ORG>/gitops --merge
-```
-
-Repeat for each backend service. After merging all PRs, verify QA:
-
-```bash
-kubectl get pods -n qa
-```
-
-**Expected output:**
-```
-NAME                                      READY   STATUS    RESTARTS   AGE
-api-gateway-xxxxxxxxx-xxxxx               1/1     Running   0          2m
-auth-service-xxxxxxxxx-xxxxx              1/1     Running   0          2m
-catalog-service-xxxxxxxxx-xxxxx           1/1     Running   0          2m
-inventory-service-xxxxxxxxx-xxxxx         1/1     Running   0          2m
-manufacturing-service-xxxxxxxxx-xxxxx     1/1     Running   0          2m
-notification-service-xxxxxxxxx-xxxxx      1/1     Running   0          2m
-pharma-ui-xxxxxxxxx-xxxxx                 1/1     Running   0          10m
-qc-service-xxxxxxxxx-xxxxx               1/1     Running   0          2m
-supplier-service-xxxxxxxxx-xxxxx          1/1     Running   0          2m
-```
-
-### Step 2: Promote Backend from QA to Prod
-
-The backend repo has a consolidated promotion workflow (`promote-prod.yml`) with a service dropdown. You must trigger it once per service.
-
-**Option A — GitHub UI:**
-
-1. Go to your backend repo: `https://github.com/<YOUR_ORG>/backend`
-2. Click the **Actions** tab
-3. In the left sidebar, click **Promote to PROD**
-4. Click **Run workflow**
-5. Select a service from the **Service to promote** dropdown (e.g., `api-gateway`)
-6. Click **Run workflow**
-7. Repeat for each service
-
-**Option B — GitHub CLI:**
-
-```bash
-# Promote each service one at a time
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=api-gateway
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=auth-service
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=catalog-service
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=inventory-service
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=manufacturing-service
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=notification-service
-gh workflow run promote-prod.yml --repo <YOUR_ORG>/backend -f service=supplier-service
-```
-
-> **Why one service at a time?** Each promotion creates its own PR. This lets you promote services independently — you might want api-gateway in prod today but hold back a supplier-service change until next week.
-
-### Step 3: Review and Merge PROD PRs
-
-Each triggered workflow creates a separate PR in the gitops repo. Review and merge them:
-
-```bash
-gh pr list --repo <YOUR_ORG>/gitops
-```
-
-Review the diff for each PR to confirm only `image.tag` changed, then merge:
-
-```bash
-gh pr merge <PR_NUMBER> --repo <YOUR_ORG>/gitops --merge
-```
-
-### Step 4: Verify All Services in Prod
-
-```bash
-kubectl get pods -n prod
-```
-
-**Expected output:**
-```
-NAME                                      READY   STATUS    RESTARTS   AGE
-api-gateway-xxxxxxxxx-xxxxx               1/1     Running   0          3m
-auth-service-xxxxxxxxx-xxxxx              1/1     Running   0          3m
-catalog-service-xxxxxxxxx-xxxxx           1/1     Running   0          3m
-inventory-service-xxxxxxxxx-xxxxx         1/1     Running   0          3m
-manufacturing-service-xxxxxxxxx-xxxxx     1/1     Running   0          3m
-notification-service-xxxxxxxxx-xxxxx      1/1     Running   0          3m
-pharma-ui-xxxxxxxxx-xxxxx                 1/1     Running   0          15m
-supplier-service-xxxxxxxxx-xxxxx          1/1     Running   0          3m
-```
-
-```bash
-kubectl get ingress -n prod
-```
-
-Check the ArgoCD UI — all `*-prod` applications should be **Synced** and **Healthy**.
+> **Optional exercise — promoting backend services:** This course demonstrates environment promotion end-to-end using pharma-ui only. The exact same pattern applies to all 8 backend services: create QA/Prod values files and ArgoCD apps per service (Modules 8.2/8.3), then trigger `promote-qa.yml` / `promote-prod.yml` with the service dropdown (Module 7.5) and merge the resulting gitops PRs. Try this on your own once you're comfortable with the pharma-ui flow.
 
 ---
 
-## 8.7 Rollback Strategy
+## 8.6 Rollback Strategy
 
 One of the biggest advantages of GitOps is that rollback is just another Git operation. There is no special `kubectl rollout undo` command, no SSH into servers, no manual intervention in the cluster.
 
@@ -1038,7 +764,7 @@ This should show the previous image tag, not the one you just reverted.
 
 ---
 
-## 8.8 Course Wrap-Up
+## 8.7 Course Wrap-Up
 
 You have built a complete DevOps platform from scratch. Let's verify everything is in place and recap what you've accomplished.
 
@@ -1077,13 +803,13 @@ dev  prod  qa
 ```
 
 ```bash
-# Verify pods are running in all environments
-kubectl get pods -n dev
-kubectl get pods -n qa
-kubectl get pods -n prod
+# Verify pharma-ui pods are running in all three environments
+kubectl get pods -n dev -l app.kubernetes.io/name=pharma-service
+kubectl get pods -n qa -l app.kubernetes.io/name=pharma-service
+kubectl get pods -n prod -l app.kubernetes.io/name=pharma-service
 ```
 
-All three namespaces should have pods in `Running` state.
+Pharma-ui should be `Running` in all three namespaces. (Backend services will only show up if you completed the optional exercise in section 8.6.)
 
 ### What You Built Across 8 Modules
 
