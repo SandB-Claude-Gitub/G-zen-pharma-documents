@@ -577,20 +577,24 @@ gh --version
        ↓
   ArgoCD syncs dev deployment (auto-sync)
        ↓
-  CI opens PR: envs/qa/values-*.yaml (automated)
+  Manual trigger: promote-qa workflow (workflow_dispatch)
+       ↓
+  Opens PR: envs/qa/values-*.yaml
        ↓
   QA team reviews + approves PR → merge
        ↓
   ArgoCD syncs QA deployment (auto-sync)
        ↓
-  Manual trigger: promote-prod workflow
+  Manual trigger: promote-prod workflow (workflow_dispatch)
        ↓
-  Opens PR: envs/prod/values-*.yaml (automated)
+  Opens PR: envs/prod/values-*.yaml
        ↓
   Change board reviews + approves → merge
        ↓
   ArgoCD PROD: manual sync required → deploy
   ```
+
+> **Both QA and PROD promotion are dedicated, manually-triggered workflows** (`promote-qa-*.yml` / `promote-prod-*.yml`) — never automatic. Only the DEV deployment happens automatically as part of the CI pipeline on every merge to `develop`.
 
 > **Demonstration scope:** Module 8 demonstrates environment promotion using **pharma-ui only**. The same pattern applies identically to all 8 backend services — promoting them is left as an optional self-guided exercise (see end of 8.5).
 
