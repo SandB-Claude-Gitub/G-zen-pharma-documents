@@ -16,6 +16,7 @@
 7. [Troubleshooting](#7-troubleshooting)
 8. [Real Incidents & Operational Decisions](#8-real-incidents--operational-decisions)
 9. [Version Management & Maintenance](#9-version-management--maintenance)
+   - Q36: [EKS Terraform module major version upgrade](#q36-how-would-you-upgrade-the-eks-terraform-module-from--210-to-a-newer-major-version-what-do-you-need-to-check-first)
 10. [Advanced & AI Topics](#10-advanced--ai-topics)
 
 ---
@@ -1108,6 +1109,83 @@ Terraform EKS module pinned to `~> 21.0`, `kubernetes_version` in tfvars. EKS ad
 
 ---
 
+### Q36. How would you upgrade the EKS Terraform module from `~> 21.0` to a newer major version? What do you need to check first?
+
+**📋 In Our Project:**
+
+The EKS module is pinned to `terraform-aws-modules/eks/aws ~> 21.0` in `infra/modules/eks/main.tf`. Terraform version is `>= 1.11`, AWS provider is `~> 5.0`. The module pin `~>` allows `21.x.x` but blocks `22.x.x` — any major version bump is a deliberate change that requires planning.
+
+**🎤 Interview Answer:**
+
+> "A major module version bump is not a one-liner. Every major version of `terraform-aws-modules/eks/aws` has a migration guide listing breaking changes — ignoring it and just bumping the version number is the fastest way to destroy and recreate your EKS cluster mid-apply, which is a multi-hour outage.
+>
+> Here is the exact checklist I follow:
+>
+> **Step 1 — Read the CHANGELOG and upgrade guide.**
+> The module publishes an `UPGRADE-X.0.md` in the GitHub repo for every major version. This lists every variable that was renamed, removed, or changed type, and every resource that was restructured. Read it before touching any code.
+>
+> **Step 2 — Check Terraform minimum version.**
+> Each major module version often raises the minimum required Terraform version. For example, v21 requires `>= 1.3.2`. A jump to v22+ may require `>= 1.5` or higher. Check `versions.tf` in the module source:
+> ```bash
+> # Check what the new module version requires
+> curl -s https://raw.githubusercontent.com/terraform-aws-modules/terraform-aws-eks/v22.0.0/versions.tf
+> # Look for: required_version = ">= X.Y.Z"
+> ```
+> If your Terraform CLI is older, upgrade Terraform first — separately from the module upgrade.
+>
+> **Step 3 — Check AWS provider minimum version.**
+> The module pins a minimum `hashicorp/aws` provider version in its `versions.tf`. A major module bump frequently raises this:
+> ```hcl
+> # Our current constraint in infra/envs/dev/main.tf
+> required_providers {
+>   aws = { source = "hashicorp/aws", version = "~> 5.0" }
+> }
+> ```
+> If the new module requires `>= 5.61` and we're on `5.40`, we need to bump the AWS provider version first. AWS provider minor versions are generally backwards compatible but worth testing.
+>
+> **Step 4 — Check Kubernetes and TLS provider versions.**
+> The EKS module also uses `hashicorp/kubernetes` and `hashicorp/tls` providers. The new module version may raise those minimums too. Check the module's `versions.tf` for all provider constraints.
+>
+> **Step 5 — Audit variable and output signature changes.**
+> This is the most common source of breakage. Between v20 and v21, for example, several node group variable names changed:
+> ```hcl
+> # v20 style
+> eks_managed_node_group_defaults = { ... }
+>
+> # v21 style — same concept, different key name in some sub-fields
+> ```
+> Run a diff of your `.tfvars` and `main.tf` against the new module's `variables.tf`. Every variable you pass must still exist with the same type signature in the new version.
+>
+> **Step 6 — Run `terraform plan` and look for destroys.**
+> ```bash
+> # In the infra repo, update version constraint and run plan
+> terraform plan -out=upgrade.tfplan
+> ```
+> Scan the plan output specifically for:
+> - `# module.eks.aws_eks_cluster.this must be replaced` — this destroys the entire cluster. Do not proceed without understanding why.
+> - `# module.eks.aws_eks_node_group.this["default"] must be replaced` — this drains and replaces all nodes.
+> - `# module.eks... will be updated in-place` — safe.
+>
+> Resource destroys in an EKS module upgrade are usually caused by either a variable type change (Terraform re-creates when it can't migrate state) or internal module restructuring.
+>
+> **Step 7 — Check for `moved` blocks (state address changes).**
+> New module versions often restructure internal resources and ship `moved {}` blocks to migrate state non-destructively. If the module version you're targeting includes `moved` blocks, Terraform handles the state migration automatically during apply — no manual `terraform state mv` required. If the module does NOT ship `moved` blocks but you see unexpected destroys, you may need to manually move state:
+> ```bash
+> terraform state mv \
+>   'module.eks.aws_eks_node_group.old_address' \
+>   'module.eks.aws_eks_node_group.new_address'
+> ```
+>
+> **Step 8 — Test in dev first, wait 48 hours, then promote.**
+> Always apply the module upgrade to the dev environment first. Run the full test suite, check all pods restart cleanly, check add-ons are healthy. After 48 hours of clean operation, repeat for QA, then prod.
+>
+> **Step 9 — Upgrade EKS add-ons after the module upgrade.**
+> A new module version may support newer EKS add-on API versions. After the cluster is stable, check if CoreDNS, VPC CNI, kube-proxy, and EKS Pod Identity Agent have newer compatible versions and update them.
+>
+> **The rule we follow:** bump one thing at a time. Don't upgrade the Terraform module, the AWS provider, and the Terraform CLI in the same PR. If something breaks, you won't know which change caused it."
+
+---
+
 ## 10. Advanced & AI Topics
 
 ---
@@ -1205,3 +1283,4 @@ kubectl run debug --rm -it --image=postgres:15-alpine -n dev -- \
 | Security | "Five layers: SAST, image scan, OIDC, pod hardening, ESO for runtime secrets" |
 | GitLeaks | "First step in every pipeline — caught 3 pre-push incidents since rollout" |
 | Multi-cluster ArgoCD | "argocd cluster add → ClusterSecret → update AppProject destinations → new Applications" |
+| Module major upgrade | "Read CHANGELOG → check TF + AWS + K8s provider minimums → run plan → look for destroys → dev first" |
