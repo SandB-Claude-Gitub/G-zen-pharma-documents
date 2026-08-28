@@ -1,6 +1,6 @@
 End to End Implementation Docs attached here -
 
-https://github.com/SandB-Claude-Gitub/G-zen-pharma-documents/tree/sugananth2003-patch-1/Zen-Pharma-EndToEnd.DOCX 
+https://github.com/SandB-Claude-Gitub/G-zen-pharma-documents/tree/sugananth2003-patch-1/zen-infra-POC-Runbook-V2-updated.docx
 
 &
 
